@@ -23,7 +23,7 @@ function StatCard({
 }) {
   return (
     <Card className="flex-1 p-4 gap-2 min-h-[108px] justify-between">
-      <Ionicons name={icon} size={20} color="#A85D3F" />
+      <Ionicons name={icon} size={20} color="#FF8559" />
       <View>
         <Text className={`text-xs ${ui.text.muted}`}>{label}</Text>
         {numericValue != null && numericValue > 0 && value === String(numericValue) ? (

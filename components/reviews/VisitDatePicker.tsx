@@ -40,7 +40,7 @@ export function VisitDatePicker({
               onPress={() => onChange(iso)}
               className={cn(
                 "px-3 py-2 rounded-full",
-                active ? "bg-savr-600" : ui.surface.muted,
+                active ? "bg-savr-500" : ui.surface.muted,
               )}
             >
               <Text className={cn("text-sm font-medium", active ? "text-white" : ui.text.secondary)}>

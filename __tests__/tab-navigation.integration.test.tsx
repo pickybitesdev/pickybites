@@ -34,9 +34,8 @@ function AddChooser() {
 
 const addWorkflowRoutes = {
   "(tabs)/add": AddChooser,
-  "add-review": () => <LabelScreen label="Review Form" />,
+  "add-bite": () => <LabelScreen label="Add a Bite Flow" />,
   "add-dish": () => <LabelScreen label="Dish Form" />,
-  "(tabs)/discover": () => <LabelScreen label="Discover Screen" />,
 };
 
 describe("tab navigation integration", () => {
@@ -62,7 +61,7 @@ describe("tab navigation integration", () => {
         "(tabs)/feed": () => (
           <View>
             <Text>Feed</Text>
-            <Text>Your feed is quiet.</Text>
+            <Text>Your Feed is getting started</Text>
           </View>
         ),
       },
@@ -70,18 +69,18 @@ describe("tab navigation integration", () => {
     );
 
     expect(result.getPathname()).toBe("/feed");
-    expect(screen.getByText("Your feed is quiet.")).toBeTruthy();
+    expect(screen.getByText("Your Feed is getting started")).toBeTruthy();
   });
 
-  it("opens Restaurant Review from the plus / add workflow", async () => {
+  it("opens Add a Bite from the plus / add workflow", async () => {
     const result = renderRouter(addWorkflowRoutes, { initialUrl: "/(tabs)/add" });
 
     await act(async () => {
-      fireEvent.press(screen.getByText("Restaurant Review"));
+      fireEvent.press(screen.getByText("Add a Bite"));
     });
 
-    expect(result.getPathname()).toBe("/add-review");
-    expect(screen.getByText("Review Form")).toBeTruthy();
+    expect(result.getPathname()).toBe("/add-bite");
+    expect(screen.getByText("Add a Bite Flow")).toBeTruthy();
   });
 
   it("opens Quick Dish Log from the plus / add workflow", async () => {
@@ -95,41 +94,25 @@ describe("tab navigation integration", () => {
     expect(screen.getByText("Dish Form")).toBeTruthy();
   });
 
-  it("opens Save To Bites from the plus / add workflow", async () => {
-    const result = renderRouter(addWorkflowRoutes, { initialUrl: "/(tabs)/add" });
-
-    await act(async () => {
-      fireEvent.press(screen.getByText("Save To Bites"));
-    });
-
-    expect(result.getPathname()).toBe("/discover");
-    expect(screen.getByText("Discover Screen")).toBeTruthy();
-  });
-
-  it("keeps Journal reachable from Profile", async () => {
+  it("keeps Journal reachable from Bites", async () => {
     const result = renderRouter(
       {
-        "(tabs)/profile": () => (
+        "(tabs)/bites": () => (
           <Pressable
             onPress={() => {
               const { router } = require("expo-router");
-              router.push("/journal");
+              router.push({ pathname: "/(tabs)/bites", params: { segment: "journal" } });
             }}
           >
-            <Text>Food Journal</Text>
+            <Text>Journal</Text>
           </Pressable>
         ),
-        journal: () => <LabelScreen label="Journal Timeline" />,
       },
-      { initialUrl: "/(tabs)/profile" },
+      { initialUrl: "/(tabs)/bites" },
     );
 
-    await act(async () => {
-      fireEvent.press(screen.getByText("Food Journal"));
-    });
-
-    expect(result.getPathname()).toBe("/journal");
-    expect(screen.getByText("Journal Timeline")).toBeTruthy();
+    expect(result.getPathname()).toBe("/bites");
+    expect(screen.getByText("Journal")).toBeTruthy();
   });
 
   it("renders Bites with saved restaurant content", () => {

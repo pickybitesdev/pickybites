@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import {
-  DEMO_EMAIL, DEMO_PASSWORD,
+  DEMO_EMAIL,
   MOCK_COMMENTS, MOCK_DISHES, MOCK_FOLLOWS,
   MOCK_LIKES, MOCK_LIST_ITEMS, MOCK_LISTS, MOCK_RESTAURANTS,
   MOCK_REVIEW_PHOTOS, MOCK_REVIEWS, MOCK_USERS,
@@ -12,12 +12,14 @@ import type { PlaceResult } from "@/lib/places/types";
 import * as tier1 from "@/lib/supabase/tier1";
 import { registerForPushNotifications, showLocalNotification } from "@/lib/push";
 import * as tier2 from "@/lib/supabase/tier2";
-import type { Comment, Cuisine, Dish, Follow, Like, List, ListItem, ListCollaborator, Restaurant, Review, ReviewPhoto, ReviewTag, ReviewCategoryScores, WaitTime, User, AppNotification, Bookmark } from "@/lib/types";
+import type { Comment, Cuisine, Dish, Follow, Like, List, ListItem, ListCollaborator, Restaurant, Review, ReviewPhoto, ReviewTag, ReviewCategoryScores, WaitTime, User, AppNotification, Bookmark, Favorite, ReviewVisibility, ComparisonPreference } from "@/lib/types";
 import { APP_NAME } from "@/constants/branding";
 import { validateReviewSubmit } from "@/lib/review-validation";
 import { buildStructuredReviewFields } from "@/lib/review-scores";
+import { buildNormalizedRating, legacyTenPointFromNormalized } from "@/lib/rating-scale";
 import { generateId } from "@/lib/utils";
 import { loadHasSeenOnboarding, saveHasSeenOnboarding } from "@/lib/prefs";
+import { isDishFavorited, isRestaurantFavorited } from "@/lib/favorites";
 
 export type AuthResult = { ok: true } | { ok: false; error: string };
 
@@ -40,6 +42,7 @@ interface AppState {
   reviewPhotos: ReviewPhoto[];
   notifications: AppNotification[];
   bookmarks: Bookmark[];
+  favorites: Favorite[];
   isRefreshing: boolean;
   isDataLoaded: boolean;
   feedVersion: number;
@@ -62,6 +65,10 @@ interface AppState {
     cuisine?: Restaurant["cuisine"];
     priceLevel?: Restaurant["priceLevel"];
     rating: number;
+    ratingValue?: number;
+    ratingMax?: number;
+    normalizedRating?: number;
+    visibility?: ReviewVisibility;
     categoryScores: ReviewCategoryScores;
     ratingManualOverride?: boolean;
     waitTime?: WaitTime | null;
@@ -71,7 +78,20 @@ interface AppState {
     visitDate: string;
     tags: ReviewTag[];
     photoUris?: string[];
-    dishes: Omit<Dish, "id" | "reviewId" | "restaurantId" | "createdAt">[];
+    dishes: (Omit<
+      Dish,
+      "id" | "reviewId" | "restaurantId" | "createdAt" | "ratingValue" | "ratingMax" | "normalizedRating"
+    > & {
+      ratingValue?: number;
+      ratingMax?: number;
+      normalizedRating?: number;
+    })[];
+    comparison?: {
+      comparedRestaurantId: string;
+      preference: ComparisonPreference;
+      reason?: string;
+    };
+    saveToBites?: boolean;
   }) => Promise<{ reviewId: string; restaurantId: string } | { error: string }>;
   updateReview: (
     reviewId: string,
@@ -125,7 +145,13 @@ interface AppState {
   updateBookmarkStatus: (
     bookmarkId: string,
     status: Bookmark["status"],
+    opts?: { plannedAt?: string; visitedAt?: string; restaurantId?: string | null },
   ) => Promise<{ ok: true; restaurantId: string | null } | { ok: false; error: string }>;
+  updateReviewVisibility: (reviewId: string, visibility: ReviewVisibility) => Promise<AuthResult>;
+  toggleRestaurantFavorite: (restaurantId: string) => Promise<AuthResult>;
+  toggleDishFavorite: (dishId: string) => Promise<AuthResult>;
+  isRestaurantFavorite: (restaurantId: string) => boolean;
+  isDishFavorite: (dishId: string) => boolean;
 }
 
 function mockDataState() {
@@ -143,6 +169,7 @@ function mockDataState() {
     reviewPhotos: MOCK_REVIEW_PHOTOS,
     notifications: [] as AppNotification[],
     bookmarks: [] as Bookmark[],
+    favorites: [] as Favorite[],
   };
 }
 
@@ -161,6 +188,7 @@ function emptyDataState() {
     reviewPhotos: [] as ReviewPhoto[],
     notifications: [] as AppNotification[],
     bookmarks: [] as Bookmark[],
+    favorites: [] as Favorite[],
   };
 }
 
@@ -231,6 +259,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     authUnsub?.();
     authUnsub = supabaseApi.subscribeToAuth(async (userId) => {
+      // Local mock demo ignores remote auth events (e.g. signOut after Try Demo).
+      if (!get().useSupabase) return;
+
       if (!userId) {
         notificationUnsub?.();
         notificationUnsub = null;
@@ -318,37 +349,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   demoLogin: async () => {
-    set({ hasSeenOnboarding: true });
-    if (!get().useSupabase) {
-      const user = MOCK_USERS.find((u) => u.email === DEMO_EMAIL);
-      if (!user) return { ok: false, error: "Demo user not found" };
-      set({ isAuthenticated: true, currentUserId: user.id, ...mockDataState() });
-      return { ok: true };
-    }
-    try {
-      let userId: string | null = null;
+    const user = MOCK_USERS.find((u) => u.email === DEMO_EMAIL);
+    if (!user) return { ok: false, error: "Demo user not found" };
+
+    // Always use local mock data for Try Demo so Profile/Feed work without a
+    // seeded Supabase project or working Places keys.
+    notificationUnsub?.();
+    notificationUnsub = null;
+    set({
+      hasSeenOnboarding: true,
+      useSupabase: false,
+      isAuthenticated: true,
+      currentUserId: user.id,
+      isDataLoaded: true,
+      ...mockDataState(),
+    });
+
+    // Drop any remote session; auth listener no-ops while useSupabase is false.
+    if (isSupabaseConfigured()) {
       try {
-        userId = await supabaseApi.signIn(DEMO_EMAIL, DEMO_PASSWORD);
+        await supabaseApi.signOut();
       } catch {
-        userId = await supabaseApi.signUp({
-          email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
-          username: "alextastes",
-          displayName: "Alex Rivera",
-          city: "Los Angeles",
-        });
-        if (userId) userId = await supabaseApi.signIn(DEMO_EMAIL, DEMO_PASSWORD);
+        // ignore — demo is local-only
       }
-      const data = await supabaseApi.fetchAllData(userId);
-      set({ isAuthenticated: true, currentUserId: userId, ...data, isDataLoaded: true });
-      if (userId) {
-        setupNotificationListener(userId);
-        get().registerPush();
-      }
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "Demo login failed" };
     }
+    return { ok: true };
   },
 
   signup: async (data) => {
@@ -382,8 +407,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   logout: async () => {
     notificationUnsub?.();
     notificationUnsub = null;
-    if (get().useSupabase) await supabaseApi.signOut();
-    set({ isAuthenticated: false, currentUserId: null, ...(get().useSupabase ? emptyDataState() : {}) });
+    const wasRemote = get().useSupabase;
+    if (wasRemote) await supabaseApi.signOut();
+    set({
+      isAuthenticated: false,
+      currentUserId: null,
+      useSupabase: isSupabaseConfigured(),
+      isDataLoaded: true,
+      ...emptyDataState(),
+    });
   },
 
   refreshFeed: async () => {
@@ -428,11 +460,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     const uid = get().currentUserId;
     if (!uid) return { error: "Not signed in" };
 
+    const ratingMax = data.ratingMax ?? 10;
+    const ratingValue = data.ratingValue ?? data.rating;
+    const normalized =
+      data.normalizedRating ??
+      buildNormalizedRating(ratingValue, ratingMax).normalizedRating;
+    const visibility = data.visibility ?? "friends";
+    const legacyRating = legacyTenPointFromNormalized(normalized);
+
     const validation = validateReviewSubmit({
       restaurantId: data.restaurantId,
       restaurantName: data.restaurantName ?? data.place?.name,
       placeName: data.place?.name,
-      rating: data.rating,
+      rating: legacyRating,
+      ratingValue,
+      ratingMax,
+      visibility,
       categoryScores: data.categoryScores,
       ratingManualOverride: data.ratingManualOverride,
       waitTime: data.waitTime,
@@ -447,6 +490,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       dishes: data.dishes.map((d) => ({
         name: d.name,
         rating: d.rating,
+        ratingValue: d.ratingValue,
+        ratingMax: d.ratingMax ?? ratingMax,
         notes: d.notes,
         isBestDish: d.isBestDish,
       })),
@@ -454,7 +499,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!validation.ok) return { error: validation.error };
 
     const structured = buildStructuredReviewFields({
-      rating: data.rating,
+      rating: legacyRating,
       categoryScores: data.categoryScores,
       ratingManualOverride: data.ratingManualOverride,
       waitTime: data.waitTime,
@@ -462,11 +507,40 @@ export const useAppStore = create<AppState>((set, get) => ({
       wouldRecommend: data.wouldRecommend,
     });
 
+    const markVisited = async (restaurantId: string) => {
+      if (!data.saveToBites) return;
+      const restaurant = get().restaurants.find((r) => r.id === restaurantId);
+      if (!restaurant) return;
+      const existing = get().bookmarks.find(
+        (b) =>
+          b.userId === uid &&
+          (b.restaurantId === restaurantId ||
+            (restaurant.googlePlaceId && b.googlePlaceId === restaurant.googlePlaceId)),
+      );
+      if (!existing) {
+        await get().toggleRestaurantBookmark(restaurant);
+      }
+      const bookmark = get().bookmarks.find(
+        (b) =>
+          b.userId === uid &&
+          (b.restaurantId === restaurantId ||
+            (restaurant.googlePlaceId && b.googlePlaceId === restaurant.googlePlaceId)),
+      );
+      if (bookmark && bookmark.status !== "visited") {
+        await get().updateBookmarkStatus(bookmark.id, "visited");
+      }
+    };
+
     if (get().useSupabase) {
       try {
         const result = await supabaseApi.createReview(uid, {
           ...data,
           ...structured,
+          rating: legacyRating,
+          ratingValue,
+          ratingMax,
+          normalizedRating: normalized,
+          visibility,
           photoUris: data.photoUris ?? [],
         });
         set((s) => ({
@@ -478,15 +552,19 @@ export const useAppStore = create<AppState>((set, get) => ({
           reviewPhotos: [...result.reviewPhotos, ...s.reviewPhotos],
           isDataLoaded: true,
         }));
+        await markVisited(result.restaurantId);
         return { reviewId: result.reviewId, restaurantId: result.restaurantId };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Failed to publish review" };
       }
     }
 
-    const restaurantId = generateId("rest");
+    const existingRestaurant = data.restaurantId
+      ? get().restaurants.find((r) => r.id === data.restaurantId)
+      : null;
+    const restaurantId = existingRestaurant?.id ?? generateId("rest");
     const reviewId = generateId("rev");
-    const restaurant: Restaurant = {
+    const restaurant: Restaurant = existingRestaurant ?? {
       id: restaurantId,
       name: data.restaurantName ?? data.place?.name ?? "Unknown",
       address: data.address ?? data.place?.address ?? "",
@@ -502,20 +580,49 @@ export const useAppStore = create<AppState>((set, get) => ({
       userId: uid,
       restaurantId,
       ...structured,
+      rating: legacyRating,
+      ratingValue,
+      ratingMax,
+      normalizedRating: normalized,
+      visibility,
       text: data.text,
       visitDate: data.visitDate,
       tags: data.tags,
       createdAt: new Date().toISOString(),
     };
-    const newDishes = data.dishes.map((d) => ({
-      ...d, id: generateId("dish"), reviewId, restaurantId, createdAt: new Date().toISOString(),
-    }));
+    const newDishes = data.dishes.map((d) => {
+      const dMax = d.ratingMax ?? ratingMax;
+      const dVal = d.ratingValue ?? d.rating;
+      const dNorm = d.normalizedRating ?? buildNormalizedRating(dVal, dMax).normalizedRating;
+      return {
+        ...d,
+        rating: legacyTenPointFromNormalized(dNorm),
+        ratingValue: dVal,
+        ratingMax: dMax,
+        normalizedRating: dNorm,
+        id: generateId("dish"),
+        reviewId,
+        restaurantId,
+        createdAt: new Date().toISOString(),
+      };
+    });
     set((s) => ({
-      restaurants: [...s.restaurants, restaurant],
-      reviews: [...s.reviews, review],
-      dishes: [...s.dishes, ...newDishes],
-      isDataLoaded: true,
+      restaurants: existingRestaurant
+        ? s.restaurants
+        : [...s.restaurants, restaurant],
+      reviews: [review, ...s.reviews],
+      dishes: [...newDishes, ...s.dishes],
+      reviewPhotos: [
+        ...(data.photoUris ?? []).map((url, i) => ({
+          id: generateId("photo"),
+          reviewId,
+          url,
+          createdAt: new Date().toISOString(),
+        })),
+        ...s.reviewPhotos,
+      ],
     }));
+    await markVisited(restaurantId);
     return { reviewId, restaurantId };
   },
 
@@ -981,9 +1088,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     const review = get().reviews.find((r) => r.id === reviewId);
     if (!review || review.userId !== uid) return { error: "Review not found" };
     const created: Dish = {
-      id: generateId("dish"), reviewId, restaurantId: review.restaurantId,
-      name: dish.name.trim(), rating: dish.rating, notes: dish.notes,
-      photoUrl: null, isBestDish: dish.isBestDish, createdAt: new Date().toISOString(),
+      id: generateId("dish"),
+      reviewId,
+      restaurantId: review.restaurantId,
+      name: dish.name.trim(),
+      rating: dish.rating,
+      ratingValue: dish.rating,
+      ratingMax: 10,
+      normalizedRating: Math.min(100, Math.max(0, dish.rating * 10)),
+      notes: dish.notes,
+      photoUrl: null,
+      isBestDish: dish.isBestDish,
+      createdAt: new Date().toISOString(),
     };
     set((s) => ({ dishes: [...s.dishes, created] }));
     return { dishId: created.id };
@@ -1145,16 +1261,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ bookmarks: s.bookmarks.filter((b) => b.id !== bookmarkId) }));
   },
 
-  updateBookmarkStatus: async (bookmarkId, status) => {
+  updateBookmarkStatus: async (bookmarkId, status, opts) => {
     const bookmark = get().bookmarks.find((b) => b.id === bookmarkId);
     if (!bookmark) return { ok: false, error: "Bookmark not found" };
 
     const now = new Date().toISOString();
+    const plannedAt =
+      status === "planned" ? (opts?.plannedAt ?? now) : bookmark.plannedAt;
+    const visitedAt =
+      status === "visited" ? (opts?.visitedAt ?? now) : bookmark.visitedAt;
+    const restaurantId =
+      opts?.restaurantId !== undefined ? opts.restaurantId : bookmark.restaurantId;
+
     const patch: Partial<Bookmark> = {
       status,
       updatedAt: now,
-      ...(status === "planned" ? { plannedAt: now } : {}),
-      ...(status === "visited" ? { visitedAt: now } : {}),
+      plannedAt: plannedAt ?? null,
+      visitedAt: visitedAt ?? null,
+      restaurantId: restaurantId ?? null,
     };
 
     const previous = bookmark;
@@ -1166,8 +1290,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         const updated = await tier2.updateBookmarkDb(bookmarkId, {
           status,
-          plannedAt: status === "planned" ? now : undefined,
-          visitedAt: status === "visited" ? now : undefined,
+          plannedAt: status === "planned" ? plannedAt : undefined,
+          visitedAt: status === "visited" ? visitedAt : undefined,
+          restaurantId: opts?.restaurantId !== undefined ? opts.restaurantId : undefined,
         });
         set((s) => ({
           bookmarks: s.bookmarks.map((b) => (b.id === bookmarkId ? updated : b)),
@@ -1182,5 +1307,125 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const current = get().bookmarks.find((b) => b.id === bookmarkId)!;
     return { ok: true, restaurantId: current.restaurantId };
+  },
+
+  isRestaurantFavorite: (restaurantId) =>
+    Boolean(isRestaurantFavorited(get().favorites, restaurantId)),
+
+  isDishFavorite: (dishId) => Boolean(isDishFavorited(get().favorites, dishId)),
+
+  updateReviewVisibility: async (reviewId, visibility) => {
+    const uid = get().currentUserId;
+    if (!uid) return { ok: false, error: "Not signed in" };
+    const existing = get().reviews.find((r) => r.id === reviewId && r.userId === uid);
+    if (!existing) return { ok: false, error: "Review not found" };
+
+    const previous = existing.visibility;
+    set((s) => ({
+      reviews: s.reviews.map((r) => (r.id === reviewId ? { ...r, visibility } : r)),
+    }));
+
+    if (get().useSupabase) {
+      try {
+        const supabase = (await import("@/lib/supabase/client")).getSupabase();
+        if (!supabase) throw new Error("Supabase not configured");
+        const { error } = await supabase
+          .from("reviews")
+          .update({ visibility })
+          .eq("id", reviewId)
+          .eq("user_id", uid);
+        if (error) throw new Error(error.message);
+      } catch (e) {
+        set((s) => ({
+          reviews: s.reviews.map((r) =>
+            r.id === reviewId ? { ...r, visibility: previous } : r,
+          ),
+        }));
+        return { ok: false, error: e instanceof Error ? e.message : "Could not update visibility" };
+      }
+    }
+    return { ok: true };
+  },
+
+  toggleRestaurantFavorite: async (restaurantId) => {
+    const uid = get().currentUserId;
+    if (!uid) return { ok: false, error: "Not signed in" };
+
+    const existing = isRestaurantFavorited(get().favorites, restaurantId);
+    if (existing) {
+      set((s) => ({ favorites: s.favorites.filter((f) => f.id !== existing.id) }));
+      if (get().useSupabase) {
+        try {
+          await tier2.removeFavorite(existing.id);
+        } catch (e) {
+          set((s) => ({ favorites: [existing, ...s.favorites] }));
+          return { ok: false, error: e instanceof Error ? e.message : "Could not remove favorite" };
+        }
+      }
+      return { ok: true };
+    }
+
+    const temp: Favorite = {
+      id: generateId("fav"),
+      userId: uid,
+      restaurantId,
+      dishId: null,
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => ({ favorites: [temp, ...s.favorites] }));
+
+    if (get().useSupabase) {
+      try {
+        const created = await tier2.addRestaurantFavorite(uid, restaurantId);
+        set((s) => ({
+          favorites: [created, ...s.favorites.filter((f) => f.id !== temp.id)],
+        }));
+      } catch (e) {
+        set((s) => ({ favorites: s.favorites.filter((f) => f.id !== temp.id) }));
+        return { ok: false, error: e instanceof Error ? e.message : "Could not add favorite" };
+      }
+    }
+    return { ok: true };
+  },
+
+  toggleDishFavorite: async (dishId) => {
+    const uid = get().currentUserId;
+    if (!uid) return { ok: false, error: "Not signed in" };
+
+    const existing = isDishFavorited(get().favorites, dishId);
+    if (existing) {
+      set((s) => ({ favorites: s.favorites.filter((f) => f.id !== existing.id) }));
+      if (get().useSupabase) {
+        try {
+          await tier2.removeFavorite(existing.id);
+        } catch (e) {
+          set((s) => ({ favorites: [existing, ...s.favorites] }));
+          return { ok: false, error: e instanceof Error ? e.message : "Could not remove favorite" };
+        }
+      }
+      return { ok: true };
+    }
+
+    const temp: Favorite = {
+      id: generateId("fav"),
+      userId: uid,
+      restaurantId: null,
+      dishId,
+      createdAt: new Date().toISOString(),
+    };
+    set((s) => ({ favorites: [temp, ...s.favorites] }));
+
+    if (get().useSupabase) {
+      try {
+        const created = await tier2.addDishFavorite(uid, dishId);
+        set((s) => ({
+          favorites: [created, ...s.favorites.filter((f) => f.id !== temp.id)],
+        }));
+      } catch (e) {
+        set((s) => ({ favorites: s.favorites.filter((f) => f.id !== temp.id) }));
+        return { ok: false, error: e instanceof Error ? e.message : "Could not add favorite" };
+      }
+    }
+    return { ok: true };
   },
 }));

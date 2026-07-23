@@ -86,7 +86,7 @@ export default function ListDetailScreen() {
           <View className="flex-row items-center justify-between">
             <Text className={`font-semibold ${ui.text.primary}`}>Collaborators</Text>
             <Pressable onPress={() => setInviting(!inviting)}>
-              <Text className={`text-sm font-medium text-savr-600 dark:text-savr-400`}>
+              <Text className={`text-sm font-medium text-savr-350 dark:text-savr-400`}>
                 {inviting ? "Done" : "Invite"}
               </Text>
             </Pressable>

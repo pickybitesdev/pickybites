@@ -1,7 +1,13 @@
 import {
+  BITES_SEGMENTS,
   bitesCollectionIsEmpty,
+  bitesHref,
   getBitesCollections,
-  selectBitesItems,
+  lovesHeartLabel,
+  selectBitesVisited,
+  selectBitesWantToTry,
+  visitedBookmarks,
+  wantToTryBookmarkLabel,
 } from "@/lib/bites";
 import type { Bookmark } from "@/lib/types";
 
@@ -32,29 +38,67 @@ function makeBookmark(overrides: Partial<Bookmark>): Bookmark {
 describe("bites collection selection", () => {
   const want = makeBookmark({ id: "want", status: "want_to_try", placeName: "Want Spot" });
   const planned = makeBookmark({ id: "planned", status: "planned", placeName: "Planned Spot" });
-  const favorite = makeBookmark({
-    id: "fav",
+  const visited = makeBookmark({
+    id: "visited",
     status: "visited",
-    placeName: "Favorite Spot",
+    placeName: "Visited Spot",
     visitedAt: "2024-07-01T00:00:00Z",
   });
 
-  it("puts unvisited saves in Want To Try and visited in Favorites", () => {
-    const collections = getBitesCollections([want, planned, favorite]);
+  it("includes journal in segments and defaults labels", () => {
+    expect(BITES_SEGMENTS.map((s) => s.value)).toEqual([
+      "journal",
+      "want_to_try",
+      "favorites",
+      "lists",
+    ]);
+    expect(BITES_SEGMENTS.map((s) => s.label)).toEqual([
+      "Journal",
+      "Try Next",
+      "Loves",
+      "Lists",
+    ]);
+  });
+
+  it("builds deep links and Try Next / Loves bookmark labels", () => {
+    expect(bitesHref("want_to_try")).toEqual({
+      pathname: "/(tabs)/bites",
+      params: { segment: "want_to_try" },
+    });
+    expect(bitesHref("favorites")).toEqual({
+      pathname: "/(tabs)/bites",
+      params: { segment: "favorites" },
+    });
+    expect(wantToTryBookmarkLabel(false)).toBe("Save to Try Next");
+    expect(wantToTryBookmarkLabel(true)).toBe("Remove from Try Next");
+    expect(lovesHeartLabel(false)).toBe("Add to Loves");
+    expect(lovesHeartLabel(true)).toBe("Remove from Loves");
+  });
+
+  it("puts unvisited saves in Try Next and keeps visited separately", () => {
+    const olderVisited = makeBookmark({
+      id: "visited-old",
+      status: "visited",
+      placeName: "Older",
+      visitedAt: "2024-06-01T00:00:00Z",
+    });
+    const collections = getBitesCollections([want, planned, visited, olderVisited]);
     expect(collections.wantToTry.map((b) => b.id)).toEqual(["want", "planned"]);
-    expect(collections.favorites.map((b) => b.id)).toEqual(["fav"]);
+    expect(selectBitesWantToTry(collections).map((b) => b.id)).toEqual(["want", "planned"]);
+    expect(collections.visited.map((b) => b.id)).toEqual(["visited", "visited-old"]);
+    expect(selectBitesVisited(collections).map((b) => b.id)).toEqual(["visited", "visited-old"]);
+    expect(visitedBookmarks([want, visited, olderVisited]).map((b) => b.id)).toEqual([
+      "visited",
+      "visited-old",
+    ]);
   });
 
-  it("selects the correct segment items", () => {
-    const collections = getBitesCollections([want, favorite]);
-    expect(selectBitesItems(collections, "want_to_try")).toHaveLength(1);
-    expect(selectBitesItems(collections, "favorites")[0]?.placeName).toBe("Favorite Spot");
-    expect(selectBitesItems(collections, "lists")).toEqual([]);
-  });
-
-  it("treats Bites as empty only when bookmarks and lists are empty", () => {
-    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0)).toBe(true);
-    expect(bitesCollectionIsEmpty(getBitesCollections([want]), 0)).toBe(false);
-    expect(bitesCollectionIsEmpty(getBitesCollections([]), 2)).toBe(false);
+  it("treats Bites as empty only when all collections are empty", () => {
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 0, 0)).toBe(true);
+    expect(bitesCollectionIsEmpty(getBitesCollections([want]), 0, 0, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([visited]), 0, 0, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 2, 0, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 1, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 0, 1)).toBe(false);
   });
 });

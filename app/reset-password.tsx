@@ -35,7 +35,7 @@ export default function ResetPasswordScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <ScrollView contentContainerClassName="px-6 py-8 gap-4" keyboardShouldPersistTaps="handled">
           <Text className="text-3xl font-bold text-savr-900 dark:text-savr-100 mt-4">New password</Text>
-          <Text className="text-savr-600 dark:text-savr-400">Choose a strong password (8+ characters).</Text>
+          <Text className="text-savr-350 dark:text-savr-400">Choose a strong password (8+ characters).</Text>
           <Input label="New password" value={password} onChangeText={setPassword} secureTextEntry />
           <Input label="Confirm password" value={confirm} onChangeText={setConfirm} secureTextEntry />
           {error ? <Text className="text-red-500 text-sm">{error}</Text> : null}

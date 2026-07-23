@@ -62,7 +62,7 @@ export function ForYouCarousel({ recommendations }: { recommendations: Recommend
                 <Text className="text-xs text-savr-500 dark:text-savr-400">
                   {rec.restaurant.cuisine} · {rec.restaurant.city}
                 </Text>
-                <Text className="text-sm text-savr-600 dark:text-savr-300 leading-5" numberOfLines={2}>
+                <Text className="text-sm text-savr-350 dark:text-savr-300 leading-5" numberOfLines={2}>
                   {rec.reason}
                 </Text>
               </View>

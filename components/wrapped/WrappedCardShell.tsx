@@ -10,14 +10,14 @@ export type WrappedGradient = {
 };
 
 export const WRAPPED_GRADIENTS = {
-  intro: { colors: ["#0F1219", "#1E2330", "#C96B75"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
+  intro: { colors: ["#0F1219", "#1E2330", "#FF8559"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
   stats: { colors: ["#0F172A", "#312E81", "#7C3AED"], start: { x: 0, y: 1 }, end: { x: 1, y: 0 } },
   cuisine: { colors: ["#3B0764", "#7E22CE", "#F59E0B"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
   best: { colors: ["#14532D", "#166534", "#FACC15"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
   hidden: { colors: ["#042F2E", "#0F766E", "#5EEAD4"], start: { x: 0, y: 1 }, end: { x: 1, y: 0 } },
   dna: { colors: ["#4A044E", "#86198F", "#F472B6"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
   top5: { colors: ["#1E1B4B", "#4338CA", "#C084FC"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
-  finale: { colors: ["#1E2330", "#C96B75", "#F5C6CB"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
+  finale: { colors: ["#1E2330", "#FF8559", "#FFD9CC"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
 } as const satisfies Record<string, WrappedGradient>;
 
 export function WrappedCardShell({

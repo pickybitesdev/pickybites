@@ -32,7 +32,7 @@ export function SegmentedControl<T extends string>({
               }}
               className={cn(
                 "flex-1 py-2.5 rounded-xl items-center",
-                active ? "bg-savr-600" : ui.surface.card
+                active ? "bg-savr-500" : ui.surface.card
               )}
             >
               <Text className={cn("font-semibold", active ? "text-white" : ui.text.secondary)}>

@@ -27,7 +27,7 @@ export function GettingStartedCard({
   reviewCount: number;
   followingCount: number;
 }) {
-  const [dismissed, setDismissed] = useState<boolean | null>(null);
+  const [dismissed, setDismissed] = useState(true); // hide until prefs load — avoids Feed header jump
 
   useEffect(() => {
     loadGettingStartedDismissed().then(setDismissed);
@@ -44,7 +44,7 @@ export function GettingStartedCard({
       id: "review",
       label: "Rate your first restaurant",
       done: reviewCount > 0,
-      onPress: () => router.push("/add-review"),
+      onPress: () => router.push("/add-bite"),
     },
     {
       id: "follow",
@@ -57,7 +57,7 @@ export function GettingStartedCard({
   const completed = steps.filter((s) => s.done).length;
   const allDone = completed === steps.length;
 
-  if (dismissed === null || dismissed || allDone || reviewCount >= 3) return null;
+  if (dismissed || allDone || reviewCount >= 3) return null;
 
   return (
     <View className="px-4">
@@ -77,7 +77,7 @@ export function GettingStartedCard({
             hitSlop={8}
             className="p-1"
           >
-            <Ionicons name="close" size={20} color="#B8956F" />
+            <Ionicons name="close" size={20} color="#9D9692" />
           </Pressable>
         </View>
 
@@ -95,7 +95,7 @@ export function GettingStartedCard({
               <Ionicons
                 name={step.done ? "checkmark-circle" : "ellipse-outline"}
                 size={22}
-                color={step.done ? "#2F9E44" : "#B8956F"}
+                color={step.done ? "#2FA866" : "#9D9692"}
               />
               <Text
                 className={cn(
@@ -105,7 +105,7 @@ export function GettingStartedCard({
               >
                 {step.label}
               </Text>
-              {!step.done && <Ionicons name="chevron-forward" size={16} color="#B8956F" />}
+              {!step.done && <Ionicons name="chevron-forward" size={16} color="#9D9692" />}
             </Pressable>
           ))}
         </View>

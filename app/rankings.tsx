@@ -91,7 +91,7 @@ export default function RankingsScreen() {
             title={`No ${categoryLabel} rankings yet`}
             description="Write reviews in this category to build your leaderboard."
             actionLabel="Write a Review"
-            onAction={() => router.push("/add-review")}
+            onAction={() => router.push("/add-bite")}
           />
         ) : (
           <View className="gap-4">

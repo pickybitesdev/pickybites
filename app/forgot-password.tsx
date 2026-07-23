@@ -28,7 +28,7 @@ export default function ForgotPasswordScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <ScrollView contentContainerClassName="px-6 py-8 gap-4" keyboardShouldPersistTaps="handled">
           <Text className="text-3xl font-bold text-savr-900 dark:text-savr-100 mt-4">Forgot password?</Text>
-          <Text className="text-savr-600 dark:text-savr-400">
+          <Text className="text-savr-350 dark:text-savr-400">
             Enter your email and we&apos;ll send a reset link.
           </Text>
 

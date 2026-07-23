@@ -11,14 +11,13 @@ import { hapticSuccess } from "@/lib/haptics";
 export default function Login() {
   const login = useAppStore((s) => s.login);
   const demoLogin = useAppStore((s) => s.demoLogin);
-  const users = useAppStore((s) => s.users);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const goHome = (userId: string) => {
-    const user = users.find((u) => u.id === userId);
+    const user = useAppStore.getState().users.find((u) => u.id === userId);
     if (user && !user.hasCompletedTasteQuiz) router.replace("/taste-quiz");
     else router.replace("/(tabs)/discover");
   };
@@ -58,7 +57,7 @@ export default function Login() {
           <View className="items-center mb-4 mt-4">
             <Logo size="lg" showName showTagline />
             <Text className="text-3xl font-bold text-savr-900 dark:text-savr-100 mt-3">Welcome back</Text>
-            <Text className="text-savr-600 dark:text-savr-400 text-center mt-1">Log in to continue your taste journey.</Text>
+            <Text className="text-savr-350 dark:text-savr-400 text-center mt-1">Log in to continue your taste journey.</Text>
           </View>
 
           <Button label="Try Demo — Alex Rivera" variant="demo" onPress={handleDemoLogin} loading={loading} />

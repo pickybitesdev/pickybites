@@ -50,8 +50,9 @@ Savr scores are **yours** (1.0–10.0), not Google/Yelp stars.
 1. [Google Cloud Console](https://console.cloud.google.com/) → create/select project
 2. Enable **[Places API (New)](https://console.cloud.google.com/apis/library/places.googleapis.com)**
 3. **Credentials** → Create API key → restrict to Places API (New)
-4. Add to `.env`: `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-key`
-5. Restart: `npx expo start --clear`
+4. For **local fallback only**, add to `.env`: `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-key`
+5. For production, prefer Supabase secrets + Edge Function `places` (see Tier 3 below). **Yelp keys never go in Expo `.env`.**
+6. Restart: `npx expo start --clear`
 
 Google includes **$200/month free** — enough for testing.
 
@@ -140,11 +141,31 @@ The app calls a Supabase **Edge Function** (`places`) instead of bundling your G
    supabase functions deploy places
    ```
 
-4. **Remove** `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` from your `.env` (optional key remains for local dev without the function).
+4. **Remove** `EXPO_PUBLIC_GOOGLE_PLACES_API_KEY` from your `.env` for production builds (optional key remains for local dev without the function).
 
 5. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), restrict the key to **Places API (New)** only. You can remove iOS/Android app restrictions since the key now lives on Supabase servers.
 
 **How it works:** `lib/places/google.ts` → `lib/places/remote.ts` → `supabase.functions.invoke('places')` → Google Places API.
+
+### 1b. Yelp enrichment (optional, server-only)
+
+Yelp is **not** used for discovery search. After Google returns nearby places, the app soft-enriches cards with Yelp stars / review counts via Edge Function `yelp`.
+
+**Never** put Yelp in `EXPO_PUBLIC_*` — that would embed the key in the app binary.
+
+```bash
+# Rotate the key if it was ever in .env or chat, then:
+supabase secrets set YELP_API_KEY=your-yelp-fusion-api-key
+supabase functions deploy yelp
+```
+
+**How it works:** `lib/places/yelp.ts` → `supabase.functions.invoke('yelp')` → Yelp Fusion (match/details). Missing secret or network errors fail soft — Discover still works on Google data only.
+
+Local `.env` should only have (optional):
+```
+EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=...   # local Places fallback
+# YELP_API_KEY lives only on Supabase secrets
+```
 
 ### 2. Sentry crash reporting (optional)
 
@@ -201,7 +222,9 @@ ForkLoop’s app logic lives in TypeScript modules backed by Supabase (or mock d
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-key
+# Optional local Places fallback only:
+# EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-key
+# Yelp + production Places keys: supabase secrets only (see Tier 3 above)
 ```
 
 ### Database setup
@@ -251,7 +274,7 @@ If Supabase env vars are missing, the app uses in-memory mock data (`lib/mock-da
 | `useRankings` | Personal restaurant/dish rankings |
 | `useTasteDna` | Core Taste DNA profile |
 | `useFoodJournal` | Monthly journal timeline |
-| `useSavedRestaurants` | Want To Try list (bookmarks) |
+| `useSavedRestaurants` | Try Next list (bookmarks) |
 
 ## Fallback mode
 

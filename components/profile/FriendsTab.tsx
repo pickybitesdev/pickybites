@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { sortUsersByTasteMatch } from "@/lib/taste-match";
+import { searchAppUsers, normalizeFriendSearchQuery } from "@/lib/friend-search";
 import { userProfileHref } from "@/lib/navigation";
 import { shareInvite } from "@/lib/share";
 import { APP_NAME } from "@/constants/branding";
@@ -23,6 +24,7 @@ export function FriendsTab({ from = "profile-friends" }: { from?: "profile-frien
     useAppStore();
   const [query, setQuery] = useState("");
   const me = users.find((u) => u.id === currentUserId);
+  const hasQuery = normalizeFriendSearchQuery(query).length > 0;
 
   const followingIds = useMemo(
     () => follows.filter((f) => f.followerId === currentUserId).map((f) => f.followingId),
@@ -30,30 +32,23 @@ export function FriendsTab({ from = "profile-friends" }: { from?: "profile-frien
   );
 
   const followingSorted = useMemo(() => {
-    if (!currentUserId) return [];
+    if (!currentUserId || hasQuery) return [];
     return sortUsersByTasteMatch(currentUserId, followingIds, reviews, restaurants)
       .map((entry) => ({
         ...entry,
         user: users.find((u) => u.id === entry.userId)!,
       }))
       .filter((x) => x.user);
-  }, [currentUserId, followingIds, reviews, restaurants, users]);
+  }, [currentUserId, followingIds, reviews, restaurants, users, hasQuery]);
 
+  /** Browse suggestions: people you do not follow yet (hidden while searching). */
   const discover = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let others = users.filter((u) => u.id !== currentUserId && !followingIds.includes(u.id));
-    if (q) {
-      others = others.filter(
-        (u) =>
-          u.displayName.toLowerCase().includes(q) ||
-          u.username.toLowerCase().includes(q) ||
-          u.city.toLowerCase().includes(q),
-      );
-    }
+    if (hasQuery) return [];
+    const others = users.filter((u) => u.id !== currentUserId && !followingIds.includes(u.id));
     if (!currentUserId) {
       return others.map((user) => ({
         user,
-        match: { percent: 0, explanations: [], detail: undefined },
+        match: { percent: 0, explanations: [] as string[], detail: undefined as string | undefined },
       }));
     }
     return sortUsersByTasteMatch(
@@ -64,7 +59,27 @@ export function FriendsTab({ from = "profile-friends" }: { from?: "profile-frien
     )
       .map((entry) => ({ ...entry, user: users.find((u) => u.id === entry.userId)! }))
       .filter((x) => x.user);
-  }, [users, currentUserId, followingIds, query, reviews, restaurants]);
+  }, [users, currentUserId, followingIds, hasQuery, reviews, restaurants]);
+
+  /** Active search: every on-app user matching name / @username / city (including friends). */
+  const searchResults = useMemo(() => {
+    if (!hasQuery) return [];
+    const matched = searchAppUsers(users, { query, currentUserId });
+    if (!currentUserId) {
+      return matched.map((user) => ({
+        user,
+        match: { percent: 0, explanations: [] as string[], detail: undefined as string | undefined },
+      }));
+    }
+    return sortUsersByTasteMatch(
+      currentUserId,
+      matched.map((u) => u.id),
+      reviews,
+      restaurants,
+    )
+      .map((entry) => ({ ...entry, user: users.find((u) => u.id === entry.userId)! }))
+      .filter((x) => x.user);
+  }, [hasQuery, users, query, currentUserId, reviews, restaurants]);
 
   const myReviewCount = reviews.filter((r) => r.userId === currentUserId).length;
 
@@ -90,59 +105,93 @@ export function FriendsTab({ from = "profile-friends" }: { from?: "profile-frien
         placeholder="Find people by name, @username, or city..."
         autoCapitalize="none"
         autoCorrect={false}
+        testID="friends-search-input"
       />
 
-      {followingSorted.length > 0 ? (
-        <View className="gap-3">
-          <Text className={`text-sm font-semibold ${ui.text.secondary}`}>Friends · sorted by taste match</Text>
-          {followingSorted.map(({ user, match }) => {
-            const count = reviews.filter((r) => r.userId === user.id).length;
-            return (
-              <FriendRow
-                key={user.id}
-                user={user}
-                reviewCount={count}
-                match={match}
-                isFollowing={isFollowing(user.id)}
-                onFollow={() => toggleFollow(user.id)}
-                isDark={isDark}
-                from={from}
-              />
-            );
-          })}
-        </View>
+      {hasQuery ? (
+        searchResults.length > 0 ? (
+          <View className="gap-3" testID="friends-search-results">
+            <Text className={`text-sm font-semibold ${ui.text.secondary}`}>Search results</Text>
+            {searchResults.map(({ user, match }) => {
+              const count = reviews.filter((r) => r.userId === user.id).length;
+              const following = isFollowing(user.id);
+              return (
+                <FriendRow
+                  key={user.id}
+                  user={user}
+                  reviewCount={count}
+                  match={match}
+                  isFollowing={following}
+                  onFollow={() => toggleFollow(user.id)}
+                  isDark={isDark}
+                  showFollow={!following}
+                  from={from}
+                />
+              );
+            })}
+          </View>
+        ) : (
+          <EmptyState
+            icon="search-outline"
+            title="No one found"
+            description={`Try another name or @username. If they’re on ${APP_NAME}, they should show up here.`}
+            actionLabel={`Invite to ${APP_NAME}`}
+            onAction={() => shareInvite(me?.displayName)}
+          />
+        )
       ) : (
-        <EmptyState
-          icon="people-outline"
-          title="No friends yet"
-          description="Follow food lovers to compare taste matches and see what they're eating."
-          actionLabel={`Invite to ${APP_NAME}`}
-          onAction={() => shareInvite(me?.displayName)}
-        />
-      )}
+        <>
+          {followingSorted.length > 0 ? (
+            <View className="gap-3">
+              <Text className={`text-sm font-semibold ${ui.text.secondary}`}>Friends · sorted by taste match</Text>
+              {followingSorted.map(({ user, match }) => {
+                const count = reviews.filter((r) => r.userId === user.id).length;
+                return (
+                  <FriendRow
+                    key={user.id}
+                    user={user}
+                    reviewCount={count}
+                    match={match}
+                    isFollowing={isFollowing(user.id)}
+                    onFollow={() => toggleFollow(user.id)}
+                    isDark={isDark}
+                    from={from}
+                  />
+                );
+              })}
+            </View>
+          ) : (
+            <EmptyState
+              icon="people-outline"
+              title="No friends yet"
+              description="Follow food lovers to compare taste matches and see what they're eating."
+              actionLabel={`Invite to ${APP_NAME}`}
+              onAction={() => shareInvite(me?.displayName)}
+            />
+          )}
 
-      {discover.length > 0 && (
-        <View className="gap-3">
-          <Text className={`text-sm font-semibold ${ui.text.secondary}`}>
-            {query ? "Search results" : "Discover food lovers"}
-          </Text>
-          {discover.slice(0, query ? 20 : 8).map(({ user, match }) => {
-            const count = reviews.filter((r) => r.userId === user.id).length;
-            return (
-              <FriendRow
-                key={user.id}
-                user={user}
-                reviewCount={count}
-                match={match}
-                isFollowing={false}
-                onFollow={() => toggleFollow(user.id)}
-                isDark={isDark}
-                showFollow
-                from={from}
-              />
-            );
-          })}
-        </View>
+          {discover.length > 0 && (
+            <View className="gap-3">
+              <Text className={`text-sm font-semibold ${ui.text.secondary}`}>Discover food lovers</Text>
+              {discover.slice(0, 8).map(({ user, match }) => {
+                const count = reviews.filter((r) => r.userId === user.id).length;
+                return (
+                  <FriendRow
+                    key={user.id}
+                    user={user}
+                    reviewCount={count}
+                    match={match}
+                    isFollowing={false}
+                    onFollow={() => toggleFollow(user.id)}
+                    isDark={isDark}
+                    showFollow
+                    from={from}
+                  />
+                );
+              })}
+            </View>
+          )}
+        </>
       )}
     </View>
   );

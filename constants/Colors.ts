@@ -1,20 +1,19 @@
-const tintColorLight = '#2f95dc';
-const tintColorDark = '#fff';
+import { brandColors } from "@/constants/branding";
 
+/** Re-export brand tokens for any legacy Expo Colors import sites. */
 export default {
   light: {
-    text: '#000',
-    background: '#fff',
-    tint: tintColorLight,
-    tabIconDefault: '#ccc',
-    tabIconSelected: tintColorLight,
+    text: brandColors.textPrimary,
+    background: brandColors.background,
+    tint: brandColors.primary,
+    tabIconDefault: brandColors.iconInactive,
+    tabIconSelected: brandColors.primary,
   },
   dark: {
-    text: '#fff',
-    background: '#000',
-    tint: tintColorDark,
-    tabIconDefault: '#ccc',
-    tabIconSelected: tintColorDark,
+    text: "#FAFAFA",
+    background: brandColors.backgroundDark,
+    tint: brandColors.primaryOnDark,
+    tabIconDefault: brandColors.iconInactive,
+    tabIconSelected: brandColors.primaryOnDark,
   },
 };
-

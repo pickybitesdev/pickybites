@@ -2,7 +2,18 @@ import type { Restaurant } from "@/lib/types";
 import type { PlaceResult } from "@/lib/places/types";
 import { APP_NAME } from "@/constants/branding";
 
-export type MapPinType = "rated" | "nearby";
+/**
+ * Pin categories. Only `rated` and `nearby` are emitted today.
+ * Future states (`saved`, `trending`, `friend`, `cuisine`) are reserved
+ * for marker differentiation once product rules and data exist.
+ */
+export type MapPinType =
+  | "rated"
+  | "nearby"
+  | "saved"
+  | "trending"
+  | "friend"
+  | "cuisine";
 
 export type MapPin = {
   id: string;
@@ -48,6 +59,5 @@ export function buildMapPins(restaurants: Restaurant[], nearbyPlaces: PlaceResul
   return [...rated, ...nearby];
 }
 
-/** Large marker batches can crash react-native-maps on device builds. */
-export const MAX_MAP_MARKERS = 25;
-
+/** Discover map marker / tray hard ceiling (synced with DISCOVER_RESULT_LIMIT). */
+export const MAX_MAP_MARKERS = 15;

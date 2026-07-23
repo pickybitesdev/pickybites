@@ -57,7 +57,7 @@ export default function Signup() {
             <Logo size="md" showName showTagline />
           </View>
           <Text className="text-3xl font-bold text-savr-900 dark:text-savr-100 mt-2">Create account</Text>
-          <Text className="text-savr-600 dark:text-savr-400">Start building your personal taste map.</Text>
+          <Text className="text-savr-350 dark:text-savr-400">Start building your personal taste map.</Text>
 
           <Button label="Try Demo — Alex Rivera" variant="demo" onPress={handleDemo} loading={loading} />
           <View className="flex-row items-center gap-3 my-1">

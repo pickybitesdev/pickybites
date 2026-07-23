@@ -1,7 +1,7 @@
 import type {
   Comment, Dish, Follow, Like, List, ListItem, ListCollaborator,
   Restaurant, Review, ReviewPhoto, ReviewTag, User, Cuisine, PriceLevel,
-  AppNotification, NotificationType, Bookmark, WaitTime,
+  AppNotification, NotificationType, Bookmark, Favorite, WaitTime,
 } from "@/lib/types";
 import { normalizeCategoryScores } from "@/lib/review-scores";
 
@@ -37,6 +37,10 @@ type DbReview = {
   user_id: string;
   restaurant_id: string;
   rating: number;
+  rating_value?: number | null;
+  rating_max?: number | null;
+  normalized_rating?: number | null;
+  visibility?: string | null;
   food_quality?: number | null;
   service_score?: number | null;
   atmosphere?: number | null;
@@ -57,6 +61,9 @@ type DbDish = {
   restaurant_id: string;
   name: string;
   rating: number;
+  rating_value?: number | null;
+  rating_max?: number | null;
+  normalized_rating?: number | null;
   notes: string;
   photo_url: string | null;
   is_best_dish: boolean;
@@ -149,11 +156,21 @@ export function mapRestaurant(row: DbRestaurant): Restaurant {
 
 export function mapReview(row: DbReview): Review {
   const rating = Number(row.rating);
+  const ratingMax = row.rating_max != null ? Number(row.rating_max) : 10;
+  const ratingValue = row.rating_value != null ? Number(row.rating_value) : rating;
+  const normalizedRating =
+    row.normalized_rating != null
+      ? Number(row.normalized_rating)
+      : Math.min(100, Math.max(0, rating * 10));
   return {
     id: row.id,
     userId: row.user_id,
     restaurantId: row.restaurant_id,
     rating,
+    ratingValue,
+    ratingMax,
+    normalizedRating,
+    visibility: (row.visibility as Review["visibility"]) ?? "friends",
     categoryScores: normalizeCategoryScores(
       row.food_quality != null
         ? {
@@ -177,12 +194,22 @@ export function mapReview(row: DbReview): Review {
 }
 
 export function mapDish(row: DbDish): Dish {
+  const rating = Number(row.rating);
+  const ratingMax = row.rating_max != null ? Number(row.rating_max) : 10;
+  const ratingValue = row.rating_value != null ? Number(row.rating_value) : rating;
+  const normalizedRating =
+    row.normalized_rating != null
+      ? Number(row.normalized_rating)
+      : Math.min(100, Math.max(0, rating * 10));
   return {
     id: row.id,
     reviewId: row.review_id,
     restaurantId: row.restaurant_id,
     name: row.name,
-    rating: Number(row.rating),
+    rating,
+    ratingValue,
+    ratingMax,
+    normalizedRating,
     notes: row.notes ?? "",
     photoUrl: row.photo_url,
     isBestDish: row.is_best_dish,
@@ -335,5 +362,23 @@ export function mapBookmark(row: DbBookmark): Bookmark {
     visitedAt: row.visited_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
+  };
+}
+
+type DbFavorite = {
+  id: string;
+  user_id: string;
+  restaurant_id: string | null;
+  dish_id: string | null;
+  created_at: string;
+};
+
+export function mapFavorite(row: DbFavorite): Favorite {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    restaurantId: row.restaurant_id,
+    dishId: row.dish_id,
+    createdAt: row.created_at,
   };
 }

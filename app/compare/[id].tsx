@@ -51,7 +51,7 @@ export default function CompareScreen() {
               </View>
               <View className="items-end gap-0.5">
                 <Text className={`text-xs ${ui.text.muted}`}>You {myRating.toFixed(1)} · Them {theirRating.toFixed(1)}</Text>
-                <Text className="text-xs font-medium text-savr-600 dark:text-savr-300">
+                <Text className="text-xs font-medium text-savr-350 dark:text-savr-300">
                   {diff < 0.5 ? "Almost identical!" : `${diff.toFixed(1)} pt diff`}
                 </Text>
               </View>

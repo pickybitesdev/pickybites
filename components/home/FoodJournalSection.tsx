@@ -30,14 +30,17 @@ export function FoodJournalSection({ stats }: { stats: MonthStats }) {
       <View className="flex-row items-end justify-between">
         <HomeSectionHeader title="This Month" subtitle="Your food journal at a glance" icon="book" />
         <Pressable onPress={() => router.push("/journal")} hitSlop={8}>
-          <Text className="text-sm font-semibold text-savr-600 dark:text-savr-400">Open journal</Text>
+          <Text className="text-sm font-semibold text-savr-350 dark:text-savr-400">Open journal</Text>
         </Pressable>
       </View>
 
       <View className="flex-row gap-3">
         <StatPill label="Restaurants Visited" value={stats.restaurantsVisited} />
         <StatPill label="New Cuisines" value={stats.newCuisines} />
-        <StatPill label="Avg Rating" value={stats.averageRating} />
+        <StatPill
+          label="Avg Rating"
+          value={stats.averageRating > 0 ? `${stats.averageRating.toFixed(1)}/10` : "—"}
+        />
       </View>
 
       <Button label="View Food Journal" variant="secondary" onPress={() => router.push("/journal")} />
@@ -58,20 +61,20 @@ export function MonthlyRecapCard({ stats }: { stats: MonthStats }) {
 
         <View className="gap-2">
           <View className="flex-row items-center gap-2">
-            <Ionicons name="restaurant-outline" size={18} color="#A85D3F" />
+            <Ionicons name="restaurant-outline" size={18} color="#FF8559" />
             <Text className={`text-base ${ui.text.secondary}`}>
               {stats.restaurantsVisited} Restaurant{stats.restaurantsVisited === 1 ? "" : "s"}
             </Text>
           </View>
           <View className="flex-row items-center gap-2">
-            <Ionicons name="earth-outline" size={18} color="#A85D3F" />
+            <Ionicons name="earth-outline" size={18} color="#FF8559" />
             <Text className={`text-base ${ui.text.secondary}`}>
               {stats.newCuisines} New Cuisine{stats.newCuisines === 1 ? "" : "s"}
             </Text>
           </View>
           {stats.topMeal && (
             <View className="flex-row items-center gap-2">
-              <Ionicons name="trophy-outline" size={18} color="#A85D3F" />
+              <Ionicons name="trophy-outline" size={18} color="#FF8559" />
               <Text className={`text-base ${ui.text.secondary}`}>
                 Top Meal: {stats.topMeal.name}
               </Text>

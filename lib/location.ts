@@ -38,3 +38,49 @@ export function distanceMeters(a: Coordinates, b: Coordinates): number {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+/** Fields used to build a compact Discover “Near …” label. */
+export type NearGeocodeFields = {
+  city?: string | null;
+  district?: string | null;
+  subregion?: string | null;
+  region?: string | null;
+  isoCountryCode?: string | null;
+};
+
+/**
+ * Pure formatter for reverse-geocode results.
+ * Examples: "Near Houston, TX", "Near Memorial, Houston"
+ */
+export function formatNearLocationLabel(
+  place: NearGeocodeFields | null | undefined,
+): string | null {
+  if (!place) return null;
+  const neighborhood = place.district?.trim() || null;
+  const city = place.city?.trim() || place.subregion?.trim() || null;
+  const region = place.region?.trim() || null;
+
+  if (neighborhood && city && neighborhood.toLowerCase() !== city.toLowerCase()) {
+    return `Near ${neighborhood}, ${city}`;
+  }
+  if (city && region && city.toLowerCase() !== region.toLowerCase()) {
+    const regionPart = region.length <= 3 ? region.toUpperCase() : region;
+    return `Near ${city}, ${regionPart}`;
+  }
+  if (city) return `Near ${city}`;
+  if (region) return `Near ${region}`;
+  return null;
+}
+
+/** Reverse-geocode coords into a compact “Near …” label, or null if unavailable. */
+export async function getNearLocationLabel(
+  coords: Coordinates | null | undefined,
+): Promise<string | null> {
+  if (!coords) return null;
+  try {
+    const places = await Location.reverseGeocodeAsync(coords);
+    return formatNearLocationLabel(places[0] ?? null);
+  } catch {
+    return null;
+  }
+}
+

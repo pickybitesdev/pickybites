@@ -7,7 +7,7 @@ type IconName = ComponentProps<typeof Ionicons>["name"];
 
 export function DiscoverSectionHeader({
   icon,
-  iconColor = "#A85D3F",
+  iconColor = "#FF8559",
   title,
   subtitle,
   onAction,

@@ -98,6 +98,17 @@ export function formatSavedDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+export function formatPlannedFor(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function monthlyStreakLabel(count: number): string | null {
   if (count <= 0) return null;
   return `${count} new restaurant${count === 1 ? "" : "s"} this month`;

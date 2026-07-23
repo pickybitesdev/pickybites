@@ -39,7 +39,7 @@ export default function DishScreen() {
           <Rating value={dish.rating} size="lg" />
           {dish.isBestDish && (
             <View className={`flex-row items-center gap-1 px-2 py-1 rounded-full ${ui.surface.muted}`}>
-              <Ionicons name="trophy" size={14} color="#A85D3F" />
+              <Ionicons name="trophy" size={14} color="#FF8559" />
               <Text className={`text-sm font-medium ${ui.text.secondary}`}>Best Dish</Text>
             </View>
           )}

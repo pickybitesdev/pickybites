@@ -35,7 +35,7 @@ export default function SettingsScreen() {
     <ScrollView className="flex-1 bg-savr-50 dark:bg-savr-950" contentContainerClassName="px-4 pb-6 gap-4">
       <Card className="gap-2">
         <Text className="font-semibold text-savr-900 dark:text-savr-100">Account</Text>
-        <Text className="text-sm text-savr-600 dark:text-savr-300">{user?.email}</Text>
+        <Text className="text-sm text-savr-350 dark:text-savr-300">{user?.email}</Text>
         <Text className="text-xs text-savr-400 dark:text-savr-500">Avatar upload available when Supabase Storage is configured.</Text>
       </Card>
 
@@ -48,12 +48,12 @@ export default function SettingsScreen() {
               onPress={() => { hapticSelection(); setMode(opt.mode); }}
               className={`flex-1 items-center py-3 rounded-xl border ${
                 mode === opt.mode
-                  ? "bg-savr-100 dark:bg-savr-800 border-savr-600 dark:border-savr-500"
+                  ? "bg-savr-100 dark:bg-savr-800 border-savr-500 dark:border-savr-500"
                   : cn(ui.surface.inset, ui.border.subtle, "border")
               }`}
             >
               <Ionicons name={opt.icon} size={22} color={mode === opt.mode ? colors.brand : colors.iconMuted} />
-              <Text className={`text-xs font-medium mt-1 ${mode === opt.mode ? "text-savr-800 dark:text-savr-100" : ui.text.muted}`}>
+              <Text className={`text-xs font-medium mt-1 ${mode === opt.mode ? "text-savr-500 dark:text-savr-100" : ui.text.muted}`}>
                 {opt.label}
               </Text>
             </Pressable>
@@ -64,10 +64,10 @@ export default function SettingsScreen() {
       <Card className="gap-2">
         <Text className="font-semibold text-savr-900 dark:text-savr-100">Legal</Text>
         <Pressable onPress={() => router.push("/privacy")} className="py-2">
-          <Text className="text-savr-700 dark:text-savr-300">Privacy Policy</Text>
+          <Text className="text-savr-500 dark:text-savr-300">Privacy Policy</Text>
         </Pressable>
         <Pressable onPress={() => router.push("/terms")} className="py-2">
-          <Text className="text-savr-700 dark:text-savr-300">Terms of Service</Text>
+          <Text className="text-savr-500 dark:text-savr-300">Terms of Service</Text>
         </Pressable>
       </Card>
 

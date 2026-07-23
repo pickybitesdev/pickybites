@@ -107,7 +107,7 @@ export function DiscoverScreenHeader({
         <Pressable
           onPress={() => onMapModeChange(false)}
           className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-xl ${
-            !mapMode ? "bg-savr-600" : ui.surface.muted
+            !mapMode ? "bg-savr-500" : ui.surface.muted
           }`}
         >
           <Ionicons name="list" size={18} color={!mapMode ? "#fff" : iconColors.muted} />
@@ -116,7 +116,7 @@ export function DiscoverScreenHeader({
         <Pressable
           onPress={() => onMapModeChange(true)}
           className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-xl ${
-            mapMode ? "bg-savr-600" : ui.surface.muted
+            mapMode ? "bg-savr-500" : ui.surface.muted
           }`}
         >
           <Ionicons name="map" size={18} color={mapMode ? "#fff" : iconColors.muted} />

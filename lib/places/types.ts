@@ -14,6 +14,11 @@ export interface PlaceResult {
   latitude: number;
   longitude: number;
   openNow?: boolean | null;
+  /** Optional Yelp Fusion enrichment (server-side only). */
+  yelpRating?: number | null;
+  yelpReviewCount?: number | null;
+  yelpUrl?: string | null;
+  yelpId?: string | null;
 }
 
 export interface Coordinates {

@@ -166,6 +166,9 @@ export async function addDishDb(
       restaurant_id: review.restaurant_id,
       name: dish.name.trim(),
       rating: dish.rating,
+      rating_value: dish.rating,
+      rating_max: 10,
+      normalized_rating: Math.min(100, Math.max(0, dish.rating * 10)),
       notes: dish.notes,
       is_best_dish: dish.isBestDish,
     })

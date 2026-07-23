@@ -6,16 +6,60 @@ import { scoresFromOverall } from "./review-scores";
 import { cuisineImage, FOOD_IMAGES } from "./images";
 
 function mockReview(
-  base: Omit<Review, "categoryScores" | "ratingManualOverride" | "waitTime" | "wouldReturn" | "wouldRecommend"> &
-    Partial<Pick<Review, "categoryScores" | "ratingManualOverride" | "waitTime" | "wouldReturn" | "wouldRecommend">>,
+  base: Omit<
+    Review,
+    | "categoryScores"
+    | "ratingManualOverride"
+    | "waitTime"
+    | "wouldReturn"
+    | "wouldRecommend"
+    | "ratingValue"
+    | "ratingMax"
+    | "normalizedRating"
+    | "visibility"
+  > &
+    Partial<
+      Pick<
+        Review,
+        | "categoryScores"
+        | "ratingManualOverride"
+        | "waitTime"
+        | "wouldReturn"
+        | "wouldRecommend"
+        | "ratingValue"
+        | "ratingMax"
+        | "normalizedRating"
+        | "visibility"
+      >
+    >,
 ): Review {
+  const ratingMax = base.ratingMax ?? 10;
+  const ratingValue = base.ratingValue ?? base.rating;
   return {
     ...base,
+    ratingValue,
+    ratingMax,
+    normalizedRating: base.normalizedRating ?? Math.min(100, Math.max(0, ratingValue * (100 / ratingMax))),
+    visibility: base.visibility ?? "friends",
     categoryScores: base.categoryScores ?? scoresFromOverall(base.rating),
     ratingManualOverride: base.ratingManualOverride ?? false,
     waitTime: base.waitTime ?? null,
     wouldReturn: base.wouldReturn ?? null,
     wouldRecommend: base.wouldRecommend ?? null,
+  };
+}
+
+function mockDish(
+  d: Omit<Dish, "ratingValue" | "ratingMax" | "normalizedRating"> &
+    Partial<Pick<Dish, "ratingValue" | "ratingMax" | "normalizedRating">>,
+): Dish {
+  const ratingMax = d.ratingMax ?? 10;
+  const ratingValue = d.ratingValue ?? d.rating;
+  return {
+    ...d,
+    ratingValue,
+    ratingMax,
+    normalizedRating: d.normalizedRating ?? Math.min(100, Math.max(0, ratingValue * (100 / ratingMax))),
   };
 }
 
@@ -67,6 +111,17 @@ export const MOCK_REVIEWS: Review[] = [
   mockReview({ id: "rev-15", userId: "user-4", restaurantId: "rest-15", rating: 8.6, text: "Patatas bravas with aioli that could convert skeptics.", visitDate: "2025-11-30", tags: ["Date Night", "Great Service"], createdAt: "2025-12-01T09:00:00Z" }),
   mockReview({ id: "rev-16", userId: "user-5", restaurantId: "rest-11", rating: 8.4, text: "Soup dumplings burst with hot broth. Order two baskets minimum.", visitDate: "2025-10-22", tags: ["Casual", "Hidden Gem"], createdAt: "2025-10-23T10:00:00Z" }),
   mockReview({ id: "rev-17", userId: "user-3", restaurantId: "rest-13", rating: 8.2, text: "Lamb souvlaki with tzatziki so garlicky it haunted me (compliment).", visitDate: "2025-12-12", tags: ["Casual"], createdAt: "2025-12-13T10:00:00Z" }),
+  // Extra friend activity so Feed feels full in demo mode
+  mockReview({ id: "rev-18", userId: "user-2", restaurantId: "rest-15", rating: 9.1, text: "Sangria + gambas — the patio at golden hour is the whole point.", visitDate: "2026-07-18", tags: ["Date Night", "Great Service"], createdAt: "2026-07-18T21:00:00Z" }),
+  mockReview({ id: "rev-19", userId: "user-5", restaurantId: "rest-8", rating: 8.7, text: "Short rib jjigae healed me. Bring someone who doesn’t mind sharing.", visitDate: "2026-07-17", tags: ["Casual", "Worth the Wait"], createdAt: "2026-07-17T19:30:00Z" }),
+  mockReview({ id: "rev-20", userId: "user-6", restaurantId: "rest-12", rating: 9.3, text: "Rare beef pho, extra herbs, no shortcuts. This is the one.", visitDate: "2026-07-16", tags: ["Hidden Gem", "Casual"], createdAt: "2026-07-16T13:00:00Z" }),
+  mockReview({ id: "rev-21", userId: "user-4", restaurantId: "rest-13", rating: 8.9, text: "Horiatiki salad tasted like summer. Order the grilled octopus too.", visitDate: "2026-07-15", tags: ["Date Night", "Vegan Friendly"], createdAt: "2026-07-15T18:45:00Z" }),
+  mockReview({ id: "rev-22", userId: "user-3", restaurantId: "rest-7", rating: 9.0, text: "Green curry that actually tastes green — bright, herbal, addictive.", visitDate: "2026-07-14", tags: ["Casual", "Hidden Gem"], createdAt: "2026-07-14T20:10:00Z" }),
+  mockReview({ id: "rev-23", userId: "user-2", restaurantId: "rest-10", rating: 8.4, text: "Smash burger dripped down my wrist. Zero regrets.", visitDate: "2026-07-12", tags: ["Casual"], createdAt: "2026-07-12T12:20:00Z" }),
+  mockReview({ id: "rev-24", userId: "user-5", restaurantId: "rest-1", rating: 9.5, text: "Hand roll flight was theater. Sit at the counter if you can.", visitDate: "2026-07-10", tags: ["Date Night", "Worth the Wait", "Great Service"], createdAt: "2026-07-10T22:00:00Z" }),
+  mockReview({ id: "rev-25", userId: "user-6", restaurantId: "rest-4", rating: 8.8, text: "Garlic naan disappeared in 90 seconds. Butter chicken still undefeated.", visitDate: "2026-07-08", tags: ["Casual", "Great Service"], createdAt: "2026-07-08T19:00:00Z" }),
+  mockReview({ id: "rev-26", userId: "user-4", restaurantId: "rest-3", rating: 8.6, text: "Carnitas tacos with salsa verde that clears your sinuses (affectionately).", visitDate: "2026-07-06", tags: ["Casual", "Hidden Gem"], createdAt: "2026-07-06T14:30:00Z" }),
+  mockReview({ id: "rev-27", userId: "user-3", restaurantId: "rest-14", rating: 9.2, text: "Spicy miso ramen punched up just right. Egg was jammy perfection.", visitDate: "2026-07-04", tags: ["Worth the Wait", "Casual"], createdAt: "2026-07-04T21:15:00Z" }),
 ];
 
 export const MOCK_REVIEW_PHOTOS: ReviewPhoto[] = [
@@ -78,19 +133,35 @@ export const MOCK_REVIEW_PHOTOS: ReviewPhoto[] = [
   { id: "rp-6", reviewId: "rev-11", url: FOOD_IMAGES.french, createdAt: "2025-12-06T10:00:00Z" },
   { id: "rp-7", reviewId: "rev-13", url: FOOD_IMAGES.mediterranean, createdAt: "2025-12-16T10:00:00Z" },
   { id: "rp-8", reviewId: "rev-9", url: FOOD_IMAGES.thai, createdAt: "2025-11-26T10:00:00Z" },
+  { id: "rp-9", reviewId: "rev-18", url: FOOD_IMAGES.spanish, createdAt: "2026-07-18T21:00:00Z" },
+  { id: "rp-10", reviewId: "rev-19", url: FOOD_IMAGES.korean, createdAt: "2026-07-17T19:30:00Z" },
+  { id: "rp-11", reviewId: "rev-20", url: FOOD_IMAGES.vietnamese, createdAt: "2026-07-16T13:00:00Z" },
+  { id: "rp-12", reviewId: "rev-21", url: FOOD_IMAGES.greek, createdAt: "2026-07-15T18:45:00Z" },
+  { id: "rp-13", reviewId: "rev-22", url: FOOD_IMAGES.thai, createdAt: "2026-07-14T20:10:00Z" },
+  { id: "rp-14", reviewId: "rev-23", url: FOOD_IMAGES.burger, createdAt: "2026-07-12T12:20:00Z" },
+  { id: "rp-15", reviewId: "rev-24", url: FOOD_IMAGES.japanese, createdAt: "2026-07-10T22:00:00Z" },
+  { id: "rp-16", reviewId: "rev-25", url: FOOD_IMAGES.indian, createdAt: "2026-07-08T19:00:00Z" },
+  { id: "rp-17", reviewId: "rev-26", url: FOOD_IMAGES.mexican, createdAt: "2026-07-06T14:30:00Z" },
+  { id: "rp-18", reviewId: "rev-27", url: FOOD_IMAGES.ramen, createdAt: "2026-07-04T21:15:00Z" },
+  { id: "rp-19", reviewId: "rev-3", url: FOOD_IMAGES.italian, createdAt: "2025-09-21T10:00:00Z" },
+  { id: "rp-20", reviewId: "rev-7", url: FOOD_IMAGES.sushi, createdAt: "2025-12-02T10:00:00Z" },
+  { id: "rp-21", reviewId: "rev-12", url: FOOD_IMAGES.burger, createdAt: "2025-11-09T10:00:00Z" },
+  { id: "rp-22", reviewId: "rev-14", url: FOOD_IMAGES.vietnamese, createdAt: "2025-12-09T10:00:00Z" },
+  { id: "rp-23", reviewId: "rev-15", url: FOOD_IMAGES.spanish, createdAt: "2025-12-01T09:00:00Z" },
+  { id: "rp-24", reviewId: "rev-16", url: FOOD_IMAGES.chinese, createdAt: "2025-10-23T10:00:00Z" },
 ];
 
 export const MOCK_DISHES: Dish[] = [
-  { id: "dish-1", reviewId: "rev-1", restaurantId: "rest-1", name: "Uni Nigiri", rating: 9.8, notes: "Buttery perfection", photoUrl: FOOD_IMAGES.sushi, isBestDish: true, createdAt: "2025-11-13T10:00:00Z" },
-  { id: "dish-2", reviewId: "rev-2", restaurantId: "rest-3", name: "Al Pastor Tacos", rating: 9.2, notes: "Pineapple + pork magic", photoUrl: FOOD_IMAGES.tacos, isBestDish: true, createdAt: "2025-10-06T10:00:00Z" },
-  { id: "dish-3", reviewId: "rev-3", restaurantId: "rest-2", name: "Cacio e Pepe", rating: 8.8, notes: "Perfectly emulsified", photoUrl: FOOD_IMAGES.pasta, isBestDish: true, createdAt: "2025-09-21T10:00:00Z" },
-  { id: "dish-4", reviewId: "rev-4", restaurantId: "rest-4", name: "Butter Chicken", rating: 9.9, notes: "Creamy, smoky", photoUrl: FOOD_IMAGES.indian, isBestDish: true, createdAt: "2025-11-02T10:00:00Z" },
-  { id: "dish-5", reviewId: "rev-5", restaurantId: "rest-5", name: "Jerk Chicken", rating: 10.0, notes: "Smoky, spicy, perfect", photoUrl: FOOD_IMAGES.caribbean, isBestDish: true, createdAt: "2025-12-02T10:00:00Z" },
-  { id: "dish-6", reviewId: "rev-6", restaurantId: "rest-2", name: "Tiramisu", rating: 9.5, notes: "Light, coffee-forward", photoUrl: FOOD_IMAGES.dessert, isBestDish: true, createdAt: "2025-11-19T10:00:00Z" },
-  { id: "dish-7", reviewId: "rev-8", restaurantId: "rest-14", name: "Tonkotsu Ramen", rating: 9.7, notes: "Broth for days", photoUrl: FOOD_IMAGES.ramen, isBestDish: true, createdAt: "2025-12-11T10:00:00Z" },
-  { id: "dish-8", reviewId: "rev-9", restaurantId: "rest-7", name: "Drunken Noodles", rating: 9.0, notes: "Wok hei on point", photoUrl: FOOD_IMAGES.thai, isBestDish: true, createdAt: "2025-11-26T10:00:00Z" },
-  { id: "dish-9", reviewId: "rev-11", restaurantId: "rest-9", name: "Duck Confit", rating: 9.6, notes: "Fell off the bone", photoUrl: FOOD_IMAGES.french, isBestDish: true, createdAt: "2025-12-06T10:00:00Z" },
-  { id: "dish-10", reviewId: "rev-12", restaurantId: "rest-10", name: "Double Smash Burger", rating: 8.5, notes: "Secret sauce slaps", photoUrl: FOOD_IMAGES.burger, isBestDish: true, createdAt: "2025-11-09T10:00:00Z" },
+  mockDish({ id: "dish-1", reviewId: "rev-1", restaurantId: "rest-1", name: "Uni Nigiri", rating: 9.8, notes: "Buttery perfection", photoUrl: FOOD_IMAGES.sushi, isBestDish: true, createdAt: "2025-11-13T10:00:00Z" }),
+  mockDish({ id: "dish-2", reviewId: "rev-2", restaurantId: "rest-3", name: "Al Pastor Tacos", rating: 9.2, notes: "Pineapple + pork magic", photoUrl: FOOD_IMAGES.tacos, isBestDish: true, createdAt: "2025-10-06T10:00:00Z" }),
+  mockDish({ id: "dish-3", reviewId: "rev-3", restaurantId: "rest-2", name: "Cacio e Pepe", rating: 8.8, notes: "Perfectly emulsified", photoUrl: FOOD_IMAGES.pasta, isBestDish: true, createdAt: "2025-09-21T10:00:00Z" }),
+  mockDish({ id: "dish-4", reviewId: "rev-4", restaurantId: "rest-4", name: "Butter Chicken", rating: 9.9, notes: "Creamy, smoky", photoUrl: FOOD_IMAGES.indian, isBestDish: true, createdAt: "2025-11-02T10:00:00Z" }),
+  mockDish({ id: "dish-5", reviewId: "rev-5", restaurantId: "rest-5", name: "Jerk Chicken", rating: 10.0, notes: "Smoky, spicy, perfect", photoUrl: FOOD_IMAGES.caribbean, isBestDish: true, createdAt: "2025-12-02T10:00:00Z" }),
+  mockDish({ id: "dish-6", reviewId: "rev-6", restaurantId: "rest-2", name: "Tiramisu", rating: 9.5, notes: "Light, coffee-forward", photoUrl: FOOD_IMAGES.dessert, isBestDish: true, createdAt: "2025-11-19T10:00:00Z" }),
+  mockDish({ id: "dish-7", reviewId: "rev-8", restaurantId: "rest-14", name: "Tonkotsu Ramen", rating: 9.7, notes: "Broth for days", photoUrl: FOOD_IMAGES.ramen, isBestDish: true, createdAt: "2025-12-11T10:00:00Z" }),
+  mockDish({ id: "dish-8", reviewId: "rev-9", restaurantId: "rest-7", name: "Drunken Noodles", rating: 9.0, notes: "Wok hei on point", photoUrl: FOOD_IMAGES.thai, isBestDish: true, createdAt: "2025-11-26T10:00:00Z" }),
+  mockDish({ id: "dish-9", reviewId: "rev-11", restaurantId: "rest-9", name: "Duck Confit", rating: 9.6, notes: "Fell off the bone", photoUrl: FOOD_IMAGES.french, isBestDish: true, createdAt: "2025-12-06T10:00:00Z" }),
+  mockDish({ id: "dish-10", reviewId: "rev-12", restaurantId: "rest-10", name: "Double Smash Burger", rating: 8.5, notes: "Secret sauce slaps", photoUrl: FOOD_IMAGES.burger, isBestDish: true, createdAt: "2025-11-09T10:00:00Z" }),
 ];
 
 export const MOCK_LIKES: Like[] = [

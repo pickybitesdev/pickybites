@@ -49,7 +49,7 @@ export default function NotificationsScreen() {
             >
               <Card className={`flex-row items-start gap-3 ${n.read ? "opacity-80" : "border-savr-400"}`}>
                 <View className="w-10 h-10 rounded-full bg-savr-100 dark:bg-savr-800 items-center justify-center">
-                  <Ionicons name={iconForType[n.type]} size={18} color="#A85D3F" />
+                  <Ionicons name={iconForType[n.type]} size={18} color="#FF8559" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-savr-900 dark:text-savr-100">{n.message}</Text>

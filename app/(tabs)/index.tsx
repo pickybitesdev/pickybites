@@ -79,7 +79,7 @@ export default function HomeScreen() {
           return;
         }
       }
-      router.push("/(tabs)/bites");
+      router.push({ pathname: "/(tabs)/bites", params: { segment: "want_to_try" } });
     },
     [restaurants],
   );

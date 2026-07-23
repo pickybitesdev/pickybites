@@ -11,7 +11,7 @@ export function DishCard({ dish, restaurant }: { dish: Dish; restaurant: Restaur
     <Pressable onPress={() => router.push(`/dish/${dish.id}`)}>
       <Card className="flex-row items-center gap-3">
         <View className={`w-12 h-12 rounded-xl items-center justify-center ${ui.surface.muted}`}>
-          {dish.isBestDish ? <Ionicons name="trophy" size={20} color="#A85D3F" /> : <Text>🍽️</Text>}
+          {dish.isBestDish ? <Ionicons name="trophy" size={20} color="#FF8559" /> : <Text>🍽️</Text>}
         </View>
         <View className="flex-1">
           <Text className={`font-semibold ${ui.text.primary}`}>{dish.name}</Text>

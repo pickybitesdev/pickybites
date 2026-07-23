@@ -66,7 +66,7 @@ export function AddToListSheet({
                     {added ? (
                       <Text className="text-xs text-savr-400">Added</Text>
                     ) : (
-                      <Ionicons name="add-circle-outline" size={22} color="#A85D3F" />
+                      <Ionicons name="add-circle-outline" size={22} color="#FF8559" />
                     )}
                   </Pressable>
                 );

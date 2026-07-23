@@ -2,6 +2,7 @@ import type { Cuisine, Dish, PriceLevel, RankingFilters, Restaurant, Review, Rev
 import type { RankingCategoryId } from "./ranking-categories";
 import { reviewMatchesRankingCategory } from "./ranking-categories";
 import { getReviewOverallRating } from "./review-scores";
+import { getPickyBitesScore } from "./pickybites-score";
 
 export type LeaderboardEntry = {
   rank: number;
@@ -46,6 +47,8 @@ export type CommunityRestaurantScore = {
   average_rating: number;
   review_count: number;
   weighted_score: number;
+  /** 0–100 PickyBites community score */
+  pickybites_score: number;
 };
 
 export type CityRankingItem = {
@@ -63,25 +66,19 @@ export type DishRanking = {
   rating: number;
 };
 
-/** Weighted score: dampens single-review outliers. */
+/** Weighted PickyBites score (0–100 normalized). Also exposes legacy 1–10 fields. */
 export function getCommunityRestaurantScore(
   restaurantId: string,
   reviews: Review[],
-  priorMean = 7.0,
+  priorMean = 70,
   priorWeight = 5,
 ): CommunityRestaurantScore {
-  const all = reviews.filter((r) => r.restaurantId === restaurantId);
-  if (!all.length) {
-    return { average_rating: 0, review_count: 0, weighted_score: priorMean };
-  }
-  const average_rating = all.reduce((s, r) => s + getReviewOverallRating(r), 0) / all.length;
-  const review_count = all.length;
-  const weighted_score =
-    (average_rating * review_count + priorMean * priorWeight) / (review_count + priorWeight);
+  const s = getPickyBitesScore(restaurantId, reviews, priorMean, priorWeight);
   return {
-    average_rating: Math.round(average_rating * 10) / 10,
-    review_count,
-    weighted_score: Math.round(weighted_score * 10) / 10,
+    average_rating: Math.round((s.averageNormalized / 10) * 10) / 10,
+    review_count: s.reviewCount,
+    weighted_score: Math.round((s.weightedScore / 10) * 10) / 10,
+    pickybites_score: Math.round(s.weightedScore),
   };
 }
 

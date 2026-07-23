@@ -7,7 +7,7 @@ export function ScoreMeter({
   label,
   score,
   reviewCount,
-  accent = "#A85D3F",
+  accent = "#FF8559",
   kind = "generic",
 }: {
   label: string;

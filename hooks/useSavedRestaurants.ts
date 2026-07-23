@@ -37,7 +37,11 @@ export function useSavedRestaurants() {
   );
 
   const updateStatus = useCallback(
-    (bookmarkId: string, status: BucketListStatus) => updateBookmarkStatus(bookmarkId, status),
+    (
+      bookmarkId: string,
+      status: BucketListStatus,
+      opts?: { plannedAt?: string; visitedAt?: string; restaurantId?: string | null },
+    ) => updateBookmarkStatus(bookmarkId, status, opts),
     [updateBookmarkStatus],
   );
 

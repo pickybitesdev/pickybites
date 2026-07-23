@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { getRestaurantRatingsBreakdown } from "@/lib/restaurant-stats";
 import { fetchPlaceDetails, isGooglePlacesConfigured } from "@/lib/places/google";
+import { enrichPlaceWithYelp, isYelpConfigured, type YelpEnrichment } from "@/lib/places/yelp";
 import { shareRestaurant, openInMaps } from "@/lib/share";
 import { ReviewCard } from "@/components/reviews/ReviewCard";
 import { DishCard } from "@/components/dishes/DishCard";
@@ -18,6 +19,13 @@ import { APP_NAME } from "@/constants/branding";
 import { formatPrice } from "@/lib/utils";
 import { ui } from "@/constants/ui";
 import { hapticLight } from "@/lib/haptics";
+import {
+  wantToTryBookmarkLabel,
+  lovesHeartLabel,
+  bitesSegmentHint,
+  TRY_NEXT_LABEL,
+  LOVES_LABEL,
+} from "@/lib/bites";
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
@@ -33,16 +41,19 @@ export default function RestaurantScreen() {
   const {
     getRestaurant, reviews, dishes, reviewPhotos, currentUserId, follows, getUser,
     isRestaurantBookmarked, toggleRestaurantBookmark,
+    isRestaurantFavorite, toggleRestaurantFavorite,
   } = useAppStore();
   const restaurant = getRestaurant(id!);
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [yelp, setYelp] = useState<YelpEnrichment | null>(null);
 
   const restReviews = reviews.filter((r) => r.restaurantId === id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const restDishes = dishes.filter((d) => d.restaurantId === id);
   const myReview = restReviews.find((r) => r.userId === currentUserId);
   const stats = getRestaurantRatingsBreakdown(id!, currentUserId, reviews, follows, getUser);
   const bookmarked = restaurant ? isRestaurantBookmarked(restaurant) : false;
+  const favorited = restaurant ? isRestaurantFavorite(restaurant.id) : false;
 
   const reviewPhotoUrls = useMemo(() => {
     const ids = new Set(restReviews.map((r) => r.id));
@@ -62,6 +73,28 @@ export default function RestaurantScreen() {
     });
   }, [restaurant?.googlePlaceId]);
 
+  useEffect(() => {
+    if (!restaurant || !isYelpConfigured()) return;
+    if (restaurant.latitude == null || restaurant.longitude == null) return;
+    let cancelled = false;
+    void enrichPlaceWithYelp({
+      googlePlaceId: restaurant.googlePlaceId ?? restaurant.id,
+      name: restaurant.name,
+      address: restaurant.address,
+      city: restaurant.city,
+      cuisine: restaurant.cuisine,
+      priceLevel: restaurant.priceLevel,
+      imageUrl: restaurant.imageUrl,
+      latitude: restaurant.latitude,
+      longitude: restaurant.longitude,
+    }).then((result) => {
+      if (!cancelled) setYelp(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurant]);
+
   if (!restaurant) {
     return (
       <View className="flex-1 items-center justify-center bg-savr-50 dark:bg-savr-950">
@@ -76,7 +109,13 @@ export default function RestaurantScreen() {
   const handleBookmark = async () => {
     hapticLight();
     const result = await toggleRestaurantBookmark(restaurant);
-    if (!result.ok && result.error) Alert.alert("Bookmark", result.error);
+    if (!result.ok && result.error) Alert.alert(TRY_NEXT_LABEL, result.error);
+  };
+
+  const handleFavorite = async () => {
+    hapticLight();
+    const result = await toggleRestaurantFavorite(restaurant.id);
+    if (!result.ok && result.error) Alert.alert(LOVES_LABEL, result.error);
   };
 
   return (
@@ -94,7 +133,7 @@ export default function RestaurantScreen() {
         </Pressable>
       ) : (
         <View className="h-[220px] bg-savr-100 dark:bg-savr-800 items-center justify-center">
-          <Ionicons name="restaurant" size={48} color="#A85D3F" />
+          <Ionicons name="restaurant" size={48} color="#FF8559" />
         </View>
       )}
       <View className="px-4 gap-4">
@@ -102,32 +141,51 @@ export default function RestaurantScreen() {
           <View className="flex-row justify-between items-start">
             <View className="flex-1">
               <Text className="text-2xl font-bold text-savr-900 dark:text-savr-100">{restaurant.name}</Text>
-              <Text className="text-sm text-savr-600 dark:text-savr-300">{restaurant.cuisine}</Text>
+              <Text className="text-sm text-savr-350 dark:text-savr-300">{restaurant.cuisine}</Text>
             </View>
             <View className="flex-row items-center">
-              <Pressable onPress={handleBookmark} className="p-2">
-                <Ionicons name={bookmarked ? "bookmark" : "bookmark-outline"} size={24} color="#A85D3F" />
+              <Pressable
+                onPress={handleFavorite}
+                className="p-2"
+                accessibilityLabel={lovesHeartLabel(favorited)}
+                accessibilityHint={bitesSegmentHint("favorites")}
+              >
+                <Ionicons name={favorited ? "heart" : "heart-outline"} size={24} color="#FF8559" />
+              </Pressable>
+              <Pressable
+                onPress={handleBookmark}
+                className="p-2"
+                accessibilityLabel={wantToTryBookmarkLabel(bookmarked)}
+                accessibilityHint={bitesSegmentHint("want_to_try")}
+              >
+                <Ionicons name={bookmarked ? "bookmark" : "bookmark-outline"} size={24} color="#FF8559" />
               </Pressable>
               <Pressable
                 onPress={() => shareRestaurant(restaurant.id, restaurant.name, restaurant.cuisine, restaurant.city, stats.overallAvg ?? undefined)}
                 className="p-2"
               >
-                <Ionicons name="share-outline" size={24} color="#A85D3F" />
+                <Ionicons name="share-outline" size={24} color="#FF8559" />
               </Pressable>
             </View>
           </View>
           <Text className="text-sm text-savr-500 dark:text-savr-400 mt-1">{restaurant.address}, {restaurant.city}</Text>
           <View className="flex-row items-center gap-2 mt-2 flex-wrap">
-            <Text className="text-sm text-savr-600 dark:text-savr-300">{formatPrice(restaurant.priceLevel)}</Text>
+            <Text className="text-sm text-savr-350 dark:text-savr-300">{formatPrice(restaurant.priceLevel)}</Text>
             {stats.overallAvg != null && <Rating value={stats.overallAvg} size="sm" />}
+            {yelp?.rating != null ? (
+              <Text className={`text-sm ${ui.text.muted}`}>
+                Yelp {yelp.rating.toFixed(1)}
+                {yelp.reviewCount != null ? ` · ${yelp.reviewCount} reviews` : ""}
+              </Text>
+            ) : null}
           </View>
           {hasCoords && (
             <Pressable
               onPress={() => openInMaps(restaurant.latitude!, restaurant.longitude!, restaurant.name)}
               className="flex-row items-center gap-1.5 mt-2"
             >
-              <Ionicons name="navigate-outline" size={16} color="#A85D3F" />
-              <Text className="text-sm text-savr-600 dark:text-savr-300 font-medium">Open in Maps</Text>
+              <Ionicons name="navigate-outline" size={16} color="#FF8559" />
+              <Text className="text-sm text-savr-350 dark:text-savr-300 font-medium">Open in Maps</Text>
             </Pressable>
           )}
         </View>
@@ -147,7 +205,7 @@ export default function RestaurantScreen() {
             onPress={() => router.push(`/add-review?reviewId=${myReview.id}`)}
           />
         ) : (
-          <Button label="Rate this spot" onPress={() => router.push(`/add-review?restaurantId=${id}`)} />
+          <Button label="Rate this spot" onPress={() => router.push(`/add-bite?restaurantId=${id}`)} />
         )}
 
         {galleryPhotos.length > 1 && (
@@ -158,7 +216,7 @@ export default function RestaurantScreen() {
                 <Pressable key={url} onPress={() => setGalleryIndex(i)}>
                   <Image
                     source={{ uri: url }}
-                    style={{ width: 140, height: 100, borderRadius: 12, borderWidth: galleryIndex === i ? 2 : 0, borderColor: "#A85D3F" }}
+                    style={{ width: 140, height: 100, borderRadius: 12, borderWidth: galleryIndex === i ? 2 : 0, borderColor: "#FF8559" }}
                     contentFit="cover"
                   />
                 </Pressable>
@@ -174,7 +232,7 @@ export default function RestaurantScreen() {
               <Pressable key={user.id} onPress={() => router.push(`/user/${user.id}`)} className="flex-row items-center gap-3">
                 <Avatar name={user.displayName} src={user.avatarUrl} size="sm" />
                 <Text className="flex-1 text-savr-800 dark:text-savr-200">{user.displayName}</Text>
-                <Text className="font-semibold text-savr-600 dark:text-savr-300">{rating.toFixed(1)}</Text>
+                <Text className="font-semibold text-savr-350 dark:text-savr-300">{rating.toFixed(1)}</Text>
               </Pressable>
             ))}
           </View>
@@ -196,7 +254,7 @@ export default function RestaurantScreen() {
               title="No reviews yet"
               description={`Be the first on ${APP_NAME} to rate ${restaurant.name}.`}
               actionLabel="Write a Review"
-              onAction={() => router.push(`/add-review?restaurantId=${id}`)}
+              onAction={() => router.push(`/add-bite?restaurantId=${id}`)}
             />
           ) : (
             restReviews.map((r) => <ReviewCard key={r.id} review={r} showRestaurant={false} />)

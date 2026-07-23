@@ -15,7 +15,7 @@ export function StepProgress({ step, total, labels }: { step: number; total: num
         {Array.from({ length: total }).map((_, i) => (
           <View
             key={i}
-            className={cn("h-1.5 flex-1 rounded-full", i < step ? "bg-savr-600" : ui.surface.track)}
+            className={cn("h-1.5 flex-1 rounded-full", i < step ? "bg-savr-500" : ui.surface.track)}
           />
         ))}
       </View>

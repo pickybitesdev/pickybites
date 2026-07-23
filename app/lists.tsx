@@ -73,7 +73,7 @@ export default function ListsScreen() {
         )}
 
         <Pressable
-          onPress={() => router.push("/(tabs)/bites")}
+          onPress={() => router.push({ pathname: "/(tabs)/bites", params: { segment: "lists" } })}
           className={`flex-row items-center gap-3 rounded-2xl p-4 ${ui.surface.card}`}
         >
           <View className={`w-11 h-11 rounded-2xl items-center justify-center ${ui.surface.muted}`}>
@@ -81,7 +81,7 @@ export default function ListsScreen() {
           </View>
           <View className="flex-1">
             <Text className={`font-semibold ${ui.text.primary}`}>Bites</Text>
-            <Text className={`text-sm ${ui.text.muted}`}>Want To Try, Favorites, and Lists</Text>
+            <Text className={`text-sm ${ui.text.muted}`}>Try Next, Loves, and Lists</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={isDark ? iconColors.mutedDark : iconColors.muted} />
         </Pressable>

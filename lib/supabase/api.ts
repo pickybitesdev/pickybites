@@ -2,15 +2,18 @@ import { getSupabase } from "./client";
 import {
   mapUser, mapRestaurant, mapReview, mapDish, mapReviewPhoto,
   mapFollow, mapLike, mapComment, mapList, mapListItem, mapListCollaborator, mapNotification, mapBookmark,
+  mapFavorite,
 } from "./mappers";
 import { uploadReviewPhoto } from "./storage";
 import type {
   Comment, Dish, Follow, Like, List, ListItem, ListCollaborator,
   Restaurant, Review, ReviewPhoto, ReviewTag, ReviewCategoryScores, WaitTime, User, AppNotification, Bookmark,
+  Favorite, ReviewVisibility, ComparisonPreference,
 } from "@/lib/types";
 import type { Restaurant as RestaurantType } from "@/lib/types";
 import type { PlaceResult } from "@/lib/places/types";
 import { buildStructuredReviewFields } from "@/lib/review-scores";
+import { buildNormalizedRating, legacyTenPointFromNormalized } from "@/lib/rating-scale";
 import { createNotification } from "./tier1";
 
 /** Tier B/C tables — app works without these until you run the matching migrations. */
@@ -18,6 +21,7 @@ function isOptionalTableMissing(message: string) {
   const m = message.toLowerCase();
   return (
     m.includes("list_collaborators") ||
+    m.includes("favorites") ||
     m.includes("schema cache") ||
     m.includes("does not exist") ||
     m.includes("could not find the table")
@@ -38,6 +42,7 @@ export type AppData = {
   reviewPhotos: ReviewPhoto[];
   notifications: AppNotification[];
   bookmarks: Bookmark[];
+  favorites: Favorite[];
 };
 
 export async function fetchAllData(userId?: string | null): Promise<AppData> {
@@ -52,9 +57,14 @@ export async function fetchAllData(userId?: string | null): Promise<AppData> {
     ? supabase.from("bookmarks").select("*").eq("user_id", userId).order("created_at", { ascending: false })
     : Promise.resolve({ data: [] as never[], error: null });
 
+  const favoritesQuery = userId
+    ? supabase.from("favorites").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+    : Promise.resolve({ data: [] as never[], error: null });
+
   const [
     usersRes, restaurantsRes, reviewsRes, dishesRes, photosRes,
     followsRes, likesRes, commentsRes, listsRes, listItemsRes, listCollabRes, notifRes, bookmarkRes,
+    favoritesRes,
   ] = await Promise.all([
     supabase.from("users").select("*"),
     supabase.from("restaurants").select("*").order("created_at", { ascending: false }),
@@ -69,6 +79,7 @@ export async function fetchAllData(userId?: string | null): Promise<AppData> {
     supabase.from("list_collaborators").select("*"),
     notifQuery,
     bookmarkQuery,
+    favoritesQuery,
   ]);
 
   const firstError = [
@@ -80,6 +91,13 @@ export async function fetchAllData(userId?: string | null): Promise<AppData> {
 
   if (listCollabRes.error && !isOptionalTableMissing(listCollabRes.error.message)) {
     throw new Error(listCollabRes.error.message);
+  }
+
+  const favoritesMissing =
+    favoritesRes.error && isOptionalTableMissing(favoritesRes.error.message);
+
+  if (favoritesRes.error && !favoritesMissing) {
+    throw new Error(favoritesRes.error.message);
   }
 
   return {
@@ -98,6 +116,7 @@ export async function fetchAllData(userId?: string | null): Promise<AppData> {
       : (listCollabRes.data ?? []).map(mapListCollaborator),
     notifications: (notifRes.data ?? []).map(mapNotification),
     bookmarks: (bookmarkRes.data ?? []).map(mapBookmark),
+    favorites: favoritesMissing ? [] : (favoritesRes.data ?? []).map(mapFavorite),
   };
 }
 
@@ -212,6 +231,10 @@ export async function createReview(
     cuisine?: RestaurantType["cuisine"];
     priceLevel?: RestaurantType["priceLevel"];
     rating: number;
+    ratingValue?: number;
+    ratingMax?: number;
+    normalizedRating?: number;
+    visibility?: ReviewVisibility;
     categoryScores: ReviewCategoryScores;
     ratingManualOverride?: boolean;
     waitTime?: WaitTime | null;
@@ -221,7 +244,21 @@ export async function createReview(
     visitDate: string;
     tags: ReviewTag[];
     photoUris: string[];
-    dishes: { name: string; rating: number; notes: string; photoUrl: string | null; isBestDish: boolean }[];
+    dishes: {
+      name: string;
+      rating: number;
+      ratingValue?: number;
+      ratingMax?: number;
+      normalizedRating?: number;
+      notes: string;
+      photoUrl: string | null;
+      isBestDish: boolean;
+    }[];
+    comparison?: {
+      comparedRestaurantId: string;
+      preference: ComparisonPreference;
+      reason?: string;
+    };
   }
 ): Promise<{
   reviewId: string;
@@ -268,12 +305,23 @@ export async function createReview(
     wouldRecommend: data.wouldRecommend,
   });
 
+  const ratingMax = data.ratingMax ?? 10;
+  const ratingValue = data.ratingValue ?? structured.rating;
+  const normalizedRating =
+    data.normalizedRating ?? buildNormalizedRating(ratingValue, ratingMax).normalizedRating;
+  const legacyRating = legacyTenPointFromNormalized(normalizedRating);
+  const visibility: ReviewVisibility = data.visibility ?? "friends";
+
   const { data: review, error: reviewError } = await supabase
     .from("reviews")
     .insert({
       user_id: userId,
       restaurant_id: restaurant.id,
-      rating: structured.rating,
+      rating: legacyRating,
+      rating_value: ratingValue,
+      rating_max: ratingMax,
+      normalized_rating: normalizedRating,
+      visibility,
       food_quality: structured.categoryScores.foodQuality,
       service_score: structured.categoryScores.service,
       atmosphere: structured.categoryScores.atmosphere,
@@ -293,16 +341,24 @@ export async function createReview(
 
   const dishRows = data.dishes
     .filter((d) => d.name.trim())
-    .map((d) => ({
-      review_id: review.id,
-      restaurant_id: restaurant.id,
-      user_id: userId,
-      name: d.name.trim(),
-      rating: d.rating,
-      notes: d.notes,
-      photo_url: d.photoUrl,
-      is_best_dish: d.isBestDish,
-    }));
+    .map((d) => {
+      const dMax = d.ratingMax ?? ratingMax;
+      const dVal = d.ratingValue ?? d.rating;
+      const dNorm = d.normalizedRating ?? buildNormalizedRating(dVal, dMax).normalizedRating;
+      return {
+        review_id: review.id,
+        restaurant_id: restaurant.id,
+        user_id: userId,
+        name: d.name.trim(),
+        rating: legacyTenPointFromNormalized(dNorm),
+        rating_value: dVal,
+        rating_max: dMax,
+        normalized_rating: dNorm,
+        notes: d.notes,
+        photo_url: d.photoUrl,
+        is_best_dish: d.isBestDish,
+      };
+    });
 
   if (dishRows.length > 0) {
     const { error: dishError } = await supabase.from("dishes").insert(dishRows);
@@ -311,7 +367,13 @@ export async function createReview(
 
   const photoUrls = (
     await Promise.all(
-      data.photoUris.map((uri, i) => uploadReviewPhoto(userId, review.id, uri, i)),
+      data.photoUris.map(async (uri, i) => {
+        try {
+          return await uploadReviewPhoto(userId, review.id, uri, i);
+        } catch {
+          return null;
+        }
+      }),
     )
   ).filter((url): url is string => !!url);
 
@@ -321,11 +383,22 @@ export async function createReview(
       .from("review_photos")
       .insert(photoUrls.map((url) => ({ review_id: review.id, url, user_id: userId })))
       .select();
-    if (photoError) throw new Error(photoError.message);
-    reviewPhotos = (photoRows ?? []).map(mapReviewPhoto);
+    if (!photoError && photoRows) {
+      reviewPhotos = photoRows.map(mapReviewPhoto);
+      await supabase.from("restaurants").update({ image_url: photoUrls[0] }).eq("id", restaurant.id);
+      restaurant = { ...restaurant, imageUrl: photoUrls[0] };
+    }
+  }
 
-    await supabase.from("restaurants").update({ image_url: photoUrls[0] }).eq("id", restaurant.id);
-    restaurant = { ...restaurant, imageUrl: photoUrls[0] };
+  if (data.comparison?.comparedRestaurantId) {
+    await supabase.from("review_comparisons").insert({
+      user_id: userId,
+      review_id: review.id,
+      current_restaurant_id: restaurant.id,
+      compared_restaurant_id: data.comparison.comparedRestaurantId,
+      preference: data.comparison.preference,
+      reason: data.comparison.reason ?? "",
+    });
   }
 
   let dishes: Dish[] = [];

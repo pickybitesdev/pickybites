@@ -41,12 +41,12 @@ export function RankingCard({
             <Image source={{ uri: restaurant.imageUrl }} style={{ width: 112, height: 112 }} contentFit="cover" />
           ) : (
             <View className={cn("w-28 h-28 items-center justify-center", ui.surface.muted)}>
-              <Ionicons name="restaurant" size={28} color="#A85D3F" />
+              <Ionicons name="restaurant" size={28} color="#FF8559" />
             </View>
           )}
           <View className="flex-1 p-4 justify-center gap-1.5">
             <View className="flex-row items-center gap-2">
-              <Text className="text-3xl font-black" style={{ color: accent ?? "#B8956F" }}>
+              <Text className="text-3xl font-black" style={{ color: accent ?? "#FF8559" }}>
                 #{rank}
               </Text>
               {isPodium ? <Ionicons name="trophy" size={18} color={accent} /> : null}
@@ -103,15 +103,15 @@ export function DishRankingCard({
             <Image source={{ uri: photoUrl }} style={{ width: 112, height: 112 }} contentFit="cover" />
           ) : (
             <View className={cn("w-28 h-28 items-center justify-center", ui.surface.muted)}>
-              <Ionicons name="fast-food" size={28} color="#A85D3F" />
+              <Ionicons name="fast-food" size={28} color="#FF8559" />
             </View>
           )}
           <View className="flex-1 p-4 justify-center gap-1.5">
             <View className="flex-row items-center gap-2">
-              <Text className="text-3xl font-black" style={{ color: accent ?? "#B8956F" }}>
+              <Text className="text-3xl font-black" style={{ color: accent ?? "#FF8559" }}>
                 #{rank}
               </Text>
-              {isBestDish ? <Ionicons name="star" size={16} color="#A85D3F" /> : null}
+              {isBestDish ? <Ionicons name="star" size={16} color="#FF8559" /> : null}
             </View>
             <Text className={`text-base font-semibold ${ui.text.primary}`} numberOfLines={1}>
               {dishName}

@@ -37,7 +37,30 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS state TEXT DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- ─── Compatibility views (spec naming) ────────────────────────────────────────
-CREATE OR REPLACE VIEW profiles AS
+-- Fresh projects / templates sometimes leave a TABLE named profiles.
+-- DROP VIEW fails with 42809 when the name is a table (IF EXISTS does not help).
+DO $$
+DECLARE
+  obj TEXT;
+  kind "char";
+BEGIN
+  FOREACH obj IN ARRAY ARRAY['profiles', 'dish_reviews', 'saved_restaurants'] LOOP
+    SELECT c.relkind INTO kind
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = obj;
+
+    IF kind = 'r' THEN
+      EXECUTE format('DROP TABLE public.%I CASCADE', obj);
+    ELSIF kind = 'v' THEN
+      EXECUTE format('DROP VIEW public.%I CASCADE', obj);
+    ELSIF kind = 'm' THEN
+      EXECUTE format('DROP MATERIALIZED VIEW public.%I CASCADE', obj);
+    END IF;
+  END LOOP;
+END $$;
+
+CREATE VIEW public.profiles AS
 SELECT
   id,
   username,
@@ -52,7 +75,7 @@ SELECT
   updated_at
 FROM users;
 
-CREATE OR REPLACE VIEW dish_reviews AS
+CREATE VIEW public.dish_reviews AS
 SELECT
   id,
   review_id,
@@ -66,7 +89,7 @@ SELECT
   created_at
 FROM dishes;
 
-CREATE OR REPLACE VIEW saved_restaurants AS
+CREATE VIEW public.saved_restaurants AS
 SELECT
   id,
   user_id,

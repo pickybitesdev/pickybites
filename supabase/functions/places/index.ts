@@ -11,6 +11,8 @@ const FIELD_MASK = [
   "places.types",
   "places.primaryType",
   "places.photos",
+  "places.priceLevel",
+  "places.currentOpeningHours",
 ].join(",");
 
 const TYPE_MAP: Record<string, string> = {
@@ -123,17 +125,18 @@ function mapPlace(p: GooglePlace, apiKey: string) {
     imageUrl: photoUrl(p.photos?.[0]?.name, apiKey),
     latitude: p.location.latitude,
     longitude: p.location.longitude,
-    openNow: null,
+    openNow: p.currentOpeningHours?.openNow ?? null,
   };
 }
 
 type RequestBody = {
-  action: "nearby" | "search" | "details";
+  action: "nearby" | "search" | "details" | "autocomplete" | "resolve" | "searchPlaces";
   latitude?: number;
   longitude?: number;
   radiusMeters?: number;
   query?: string;
   googlePlaceId?: string;
+  sessionToken?: string;
 };
 
 serve(async (req) => {
@@ -249,6 +252,109 @@ serve(async (req) => {
       });
     }
 
+    if (body.action === "autocomplete") {
+      if (!body.query?.trim()) {
+        return json({ error: "query is required." }, 400);
+      }
+      const payload: Record<string, unknown> = { input: body.query.trim() };
+      if (body.sessionToken) payload.sessionToken = body.sessionToken;
+      if (body.latitude != null && body.longitude != null) {
+        payload.locationBias = {
+          circle: {
+            center: { latitude: body.latitude, longitude: body.longitude },
+            radius: Math.min(Math.max(Number(body.radiusMeters ?? 25000), 500), 50000),
+          },
+        };
+      }
+      const res = await fetch(`${BASE}/places:autocomplete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Google Places autocomplete error ${res.status}: ${err}`);
+      }
+      const data = await res.json();
+      const suggestions = (data.suggestions ?? [])
+        .map(mapAutocompleteSuggestion)
+        .filter(Boolean);
+      return json({ suggestions });
+    }
+
+    if (body.action === "resolve") {
+      if (!body.googlePlaceId) {
+        return json({ error: "googlePlaceId is required." }, 400);
+      }
+      const id = String(body.googlePlaceId).replace(/^places\//, "");
+      const url = new URL(`${BASE}/places/${id}`);
+      if (body.sessionToken) url.searchParams.set("sessionToken", body.sessionToken);
+      const res = await fetch(url.toString(), {
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask":
+            "id,displayName,formattedAddress,shortFormattedAddress,location,viewport,types,primaryType,photos,priceLevel,currentOpeningHours",
+        },
+      });
+      if (!res.ok) return json({ resolved: null });
+      const data = await res.json();
+      return json({ resolved: mapResolvedPlace(data, apiKey) });
+    }
+
+    if (body.action === "searchPlaces") {
+      if (!body.query?.trim()) {
+        return json({ error: "query is required." }, 400);
+      }
+      const payload: Record<string, unknown> = {
+        textQuery: body.query.trim(),
+        maxResultCount: 8,
+      };
+      if (body.latitude != null && body.longitude != null) {
+        const searchRadius = Number(body.radiusMeters ?? 25000);
+        payload.locationBias = {
+          circle: {
+            center: { latitude: body.latitude, longitude: body.longitude },
+            radius: Math.min(Math.max(searchRadius, 500), 50000),
+          },
+        };
+      }
+      const res = await fetch(`${BASE}/places:searchText`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": [
+            "places.id",
+            "places.displayName",
+            "places.formattedAddress",
+            "places.shortFormattedAddress",
+            "places.location",
+            "places.viewport",
+            "places.types",
+            "places.primaryType",
+            "places.photos",
+            "places.priceLevel",
+            "places.currentOpeningHours",
+          ].join(","),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Google Places text search error ${res.status}: ${err}`);
+      }
+      const data = await res.json();
+      const resolvedPlaces = (data.places ?? [])
+        .map((p: GooglePlace & { viewport?: { low?: Coords; high?: Coords } }) =>
+          mapResolvedPlace(p, apiKey),
+        )
+        .filter(Boolean);
+      return json({ resolvedPlaces });
+    }
+
     return json({ error: "Unknown action." }, 400);
   } catch (e) {
     console.error("places function error:", e);
@@ -336,11 +442,9 @@ function buildNearbySearchPlan(coords: Coords, radiusMeters: number) {
   return plan;
 }
 
-function mergeLimitForRadius(radiusMeters: number): number {
-  if (radiusMeters >= 14000) return 150;
-  if (radiusMeters >= 8000) return 120;
-  if (radiusMeters >= 4500) return 100;
-  return 80;
+function mergeLimitForRadius(_radiusMeters: number): number {
+  /** Keep in sync with client DISCOVER_RESULT_LIMIT (15). */
+  return 15;
 }
 
 function pickAcrossDistanceRings(
@@ -441,5 +545,106 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...cors, "Content-Type": "application/json" },
   });
+}
+
+const RESTAURANT_TYPES = new Set([
+  "restaurant",
+  "cafe",
+  "bakery",
+  "meal_takeaway",
+  "meal_delivery",
+  "bar",
+  "food",
+]);
+const AREA_TYPES = new Set([
+  "locality",
+  "sublocality",
+  "sublocality_level_1",
+  "neighborhood",
+  "administrative_area_level_1",
+  "administrative_area_level_2",
+  "administrative_area_level_3",
+  "postal_code",
+  "colloquial_area",
+  "political",
+]);
+const ADDRESS_TYPES = new Set([
+  "street_address",
+  "route",
+  "premise",
+  "subpremise",
+  "geocode",
+]);
+
+function classifyPlaceTypes(types: string[] = []): "restaurant" | "area" | "address" | "other" {
+  if (types.some((t) => RESTAURANT_TYPES.has(t) || t.endsWith("_restaurant"))) return "restaurant";
+  if (types.some((t) => ADDRESS_TYPES.has(t))) return "address";
+  if (types.some((t) => AREA_TYPES.has(t))) return "area";
+  return "other";
+}
+
+function mapAutocompleteSuggestion(raw: {
+  placePrediction?: {
+    place?: string;
+    placeId?: string;
+    text?: { text?: string };
+    structuredFormat?: {
+      mainText?: { text?: string };
+      secondaryText?: { text?: string };
+    };
+    types?: string[];
+  };
+}) {
+  const pred = raw.placePrediction;
+  if (!pred) return null;
+  const placeId = String(pred.placeId ?? pred.place ?? "").replace(/^places\//, "");
+  if (!placeId) return null;
+  const primaryText =
+    pred.structuredFormat?.mainText?.text?.trim() ||
+    pred.text?.text?.trim() ||
+    "";
+  if (!primaryText) return null;
+  const secondaryText = pred.structuredFormat?.secondaryText?.text?.trim() ?? "";
+  const kinds = pred.types ?? [];
+  return {
+    id: placeId,
+    placeId,
+    primaryText,
+    secondaryText,
+    kinds,
+    kind: classifyPlaceTypes(kinds),
+  };
+}
+
+function mapResolvedPlace(
+  p: GooglePlace & {
+    name?: string;
+    viewport?: { low?: Coords; high?: Coords };
+  },
+  apiKey: string,
+) {
+  const placeId = String(p.id ?? p.name ?? "").replace(/^places\//, "");
+  if (!placeId || !p.displayName?.text || !p.location) return null;
+  const address = p.formattedAddress ?? p.shortFormattedAddress ?? "";
+  const types = p.types ?? [];
+  const viewport =
+    p.viewport?.low && p.viewport?.high
+      ? { low: p.viewport.low, high: p.viewport.high }
+      : null;
+  return {
+    placeId,
+    name: p.displayName.text,
+    address,
+    city: cityFromAddress(address),
+    latitude: p.location.latitude,
+    longitude: p.location.longitude,
+    cuisineTypes: types,
+    primaryType: p.primaryType ?? null,
+    imageUrl: photoUrl(p.photos?.[0]?.name, apiKey),
+    priceLevel: p.priceLevel ?? null,
+    openNow: p.currentOpeningHours?.openNow ?? null,
+    viewport,
+    kind: classifyPlaceTypes(types),
+  };
 }
 

@@ -39,7 +39,7 @@ export default function TasteUnlockedScreen() {
     <SafeAreaView className={`flex-1 ${ui.screen}`}>
       <ScrollView contentContainerClassName="px-6 py-10 gap-6 items-center">
         <FadeInView className="items-center gap-3">
-          <View className="w-20 h-20 rounded-full bg-savr-600 items-center justify-center">
+          <View className="w-20 h-20 rounded-full bg-savr-500 items-center justify-center">
             <Ionicons name="sparkles" size={40} color="#fff" />
           </View>
           <Text className={`text-3xl font-black text-center ${ui.text.primary}`}>Taste Profile Updated</Text>

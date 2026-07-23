@@ -6,18 +6,39 @@ export const APP_SCHEME = "pickybites";
 export const APP_BUNDLE_ID = "com.pickybites.app";
 export const SUPPORT_EMAIL = "support@pickybites.app";
 
-/** PickyBites brand palette — rose accent + navy neutrals */
+/** PickyBites coral brand palette — warm food-focused accent + neutrals */
 export const brandColors = {
-  rose: "#C96B75",
-  roseLight: "#E8A0A8",
-  roseDark: "#A85560",
-  roseMuted: "#D48992",
+  primary: "#FF8559",
+  primaryPressed: "#E96F45",
+  primaryLight: "#FFF0EA",
+  primarySoft: "#FFD9CC",
+  /** Lighter coral for accents on dark surfaces */
+  primaryOnDark: "#FF9B78",
+  primaryMutedOnDark: "#FFB399",
+
+  background: "#FFFDFC",
+  surface: "#FFFFFF",
+  textPrimary: "#241F1D",
+  textSecondary: "#756B67",
+  border: "#EDE4E0",
+  iconInactive: "#9D9692",
+
+  success: "#2FA866",
+  warning: "#E9A23B",
+  error: "#D94A4A",
+
+  /** Dark-mode surface ladder (unchanged structure) */
+  backgroundDark: "#0F1219",
   navy: "#1E2330",
   navySoft: "#2D3345",
-  grey: "#8A8F99",
-  greyLight: "#B8BDC6",
-  background: "#FAFAFA",
-  backgroundDark: "#0F1219",
+
+  // ---- Temporary aliases (rose/navy era) — prefer semantic keys above ----
+  rose: "#FF8559",
+  roseLight: "#FF9B78",
+  roseDark: "#FF8559",
+  roseMuted: "#FFB399",
+  grey: "#9D9692",
+  greyLight: "#9D9692",
 } as const;
 
 export const APP_STORE_TAGLINE =

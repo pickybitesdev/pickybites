@@ -36,7 +36,7 @@ export function LeaderboardRow({
       >
         <View className="flex-row items-center px-3 py-3.5 min-h-[56px]">
           <View className="w-10 flex-row items-center gap-0.5">
-            <Text className="text-lg font-black" style={{ color: accent ?? "#B8956F" }}>
+            <Text className="text-lg font-black" style={{ color: accent ?? "#FF8559" }}>
               {entry.rank}
             </Text>
             {isPodium ? <Ionicons name="trophy" size={12} color={accent} /> : null}

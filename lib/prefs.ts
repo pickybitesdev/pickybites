@@ -55,3 +55,15 @@ export async function loadGettingStartedDismissed(): Promise<boolean> {
 export async function saveGettingStartedDismissed(): Promise<void> {
   await AsyncStorage.setItem(GETTING_STARTED_DISMISSED_KEY, "1");
 }
+
+const DISCOVER_VIEW_MODE_KEY = "@pickybites/discover_view_mode";
+
+export async function loadDiscoverViewMode(): Promise<"map" | "list" | null> {
+  const v = await AsyncStorage.getItem(DISCOVER_VIEW_MODE_KEY);
+  if (v === "map" || v === "list") return v;
+  return null;
+}
+
+export async function saveDiscoverViewMode(mode: "map" | "list"): Promise<void> {
+  await AsyncStorage.setItem(DISCOVER_VIEW_MODE_KEY, mode);
+}

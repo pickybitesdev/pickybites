@@ -42,7 +42,7 @@ export default function AddDishScreen() {
       <View className="flex-1 bg-savr-50 dark:bg-savr-950 items-center justify-center px-6 gap-4">
         <Text className={`text-lg font-semibold text-center ${ui.text.primary}`}>No reviews yet</Text>
         <Text className={`text-sm text-center ${ui.text.muted}`}>Write a restaurant review first, then log dishes quickly.</Text>
-        <Button label="Write a Review" onPress={() => router.replace("/add-review")} />
+        <Button label="Write a Review" onPress={() => router.replace("/add-bite")} />
         <Button label="Not now" variant="ghost" onPress={() => goBackOr("/(tabs)/add")} />
       </View>
     );
@@ -72,16 +72,16 @@ export default function AddDishScreen() {
             <Text className="text-sm font-medium text-savr-700 dark:text-savr-300">Rating: {rating.toFixed(1)}</Text>
             <View className="flex-row items-center gap-4">
               <Pressable onPress={() => setRating((v) => Math.max(1, v - 0.5))}>
-                <Ionicons name="remove-circle-outline" size={32} color="#A85D3F" />
+                <Ionicons name="remove-circle-outline" size={32} color="#FF8559" />
               </Pressable>
               <Pressable onPress={() => setRating((v) => Math.min(10, v + 0.5))}>
-                <Ionicons name="add-circle-outline" size={32} color="#A85D3F" />
+                <Ionicons name="add-circle-outline" size={32} color="#FF8559" />
               </Pressable>
             </View>
           </View>
           <Input label="Notes" value={notes} onChangeText={setNotes} placeholder="Broth was incredible..." multiline />
           <Pressable onPress={() => setIsBestDish(!isBestDish)} className="flex-row items-center gap-2">
-            <Ionicons name={isBestDish ? "star" : "star-outline"} size={22} color="#A85D3F" />
+            <Ionicons name={isBestDish ? "star" : "star-outline"} size={22} color="#FF8559" />
             <Text className="text-savr-800 dark:text-savr-200">Mark as best dish</Text>
           </Pressable>
           <Button label="Log Dish" onPress={submit} loading={loading} />

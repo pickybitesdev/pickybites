@@ -16,7 +16,7 @@ export function JournalMonthSummary({ month }: { month: FoodJournalMonth }) {
           {month.unique_cuisines} cuisine{month.unique_cuisines === 1 ? "" : "s"} tried
         </Text>
         <Text className={`text-sm ${ui.text.secondary}`}>
-          Average rating: {month.average_rating.toFixed(1)}
+          Average score: {month.average_rating.toFixed(1)}/10
         </Text>
         {month.top_meal ? (
           <Text className={`text-sm ${ui.text.secondary}`}>Top meal: {month.top_meal}</Text>

@@ -81,7 +81,7 @@ export interface AppNotification {
 export type BucketListStatus = "want_to_try" | "planned" | "visited";
 
 export const BUCKET_LIST_STATUS_LABELS: Record<BucketListStatus, string> = {
-  want_to_try: "Want To Try",
+  want_to_try: "Try Next",
   planned: "Planned",
   visited: "Visited",
 };
@@ -135,7 +135,11 @@ export interface Dish {
   reviewId: string;
   restaurantId: string;
   name: string;
+  /** Legacy 1–10 dish rating. */
   rating: number;
+  ratingValue: number;
+  ratingMax: number;
+  normalizedRating: number;
   notes: string;
   photoUrl: string | null;
   isBestDish: boolean;
@@ -158,12 +162,23 @@ export interface ReviewCategoryScores {
 
 export type WaitTime = "under_15" | "15_30" | "30_60" | "over_60";
 
+export type ReviewVisibility = "private" | "friends" | "public";
+
+export type ComparisonPreference = "current" | "compared" | "equal";
+
 export interface Review {
   id: string;
   userId: string;
   restaurantId: string;
-  /** Overall score (auto-calculated or manually adjusted). */
+  /** Legacy 1–10 overall (synced from normalized during transition). */
   rating: number;
+  /** User's chosen score on their personal scale. */
+  ratingValue: number;
+  /** User's chosen maximum (5–1000). */
+  ratingMax: number;
+  /** 0–100 public/normalized score. */
+  normalizedRating: number;
+  visibility: ReviewVisibility;
   categoryScores: ReviewCategoryScores;
   ratingManualOverride: boolean;
   waitTime: WaitTime | null;
@@ -172,6 +187,26 @@ export interface Review {
   text: string;
   visitDate: string;
   tags: ReviewTag[];
+  createdAt: string;
+}
+
+export interface ReviewComparison {
+  id: string;
+  userId: string;
+  reviewId: string;
+  currentRestaurantId: string;
+  comparedRestaurantId: string;
+  preference: ComparisonPreference;
+  reason: string;
+  createdAt: string;
+}
+
+/** Explicit user favorite — exactly one of restaurantId or dishId. */
+export interface Favorite {
+  id: string;
+  userId: string;
+  restaurantId: string | null;
+  dishId: string | null;
   createdAt: string;
 }
 

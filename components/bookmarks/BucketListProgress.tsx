@@ -16,7 +16,7 @@ export function BucketListProgress({ stats }: { stats: BucketListStats }) {
             {stats.saved} saved · {stats.visited} visited
           </Text>
         </View>
-        <Text className="text-3xl font-bold text-savr-600 dark:text-savr-400">
+        <Text className="text-3xl font-bold text-savr-500 dark:text-savr-400">
           {stats.completionPercent}%
         </Text>
       </View>
@@ -36,7 +36,7 @@ export function BucketListProgress({ stats }: { stats: BucketListStats }) {
           {stats.completionPercent}% completion
         </Text>
         {streak ? (
-          <Text className="text-xs font-semibold text-savr-600 dark:text-savr-400">
+          <Text className="text-xs font-semibold text-savr-500 dark:text-savr-400">
             {streak}
           </Text>
         ) : null}

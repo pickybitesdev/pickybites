@@ -42,10 +42,10 @@ export default function EditProfileScreen() {
             <Image source={{ uri: avatarUri ?? user?.avatarUrl ?? undefined }} className="w-24 h-24 rounded-full" />
           ) : (
             <View className="w-24 h-24 rounded-full bg-savr-200 dark:bg-savr-700 items-center justify-center">
-              <Ionicons name="person" size={40} color="#A85D3F" />
+              <Ionicons name="person" size={40} color="#FF8559" />
             </View>
           )}
-          <Text className="text-sm text-savr-600 dark:text-savr-400 mt-2">Change photo</Text>
+          <Text className="text-sm text-savr-350 dark:text-savr-400 mt-2">Change photo</Text>
         </Pressable>
         <Input label="Display Name" value={displayName} onChangeText={setDisplayName} />
         <Input label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" />

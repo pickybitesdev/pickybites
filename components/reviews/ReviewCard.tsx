@@ -8,9 +8,9 @@ import type { Review } from "@/lib/types";
 import { formatDate, formatRelative } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
-import { Rating } from "@/components/ui/Rating";
 import { ReviewScoreSummary } from "@/components/reviews/ReviewScoreSummary";
 import { getReviewOverallRating } from "@/lib/review-scores";
+import { formatUserRating } from "@/lib/rating-scale";
 import { Tag } from "@/components/ui/Tag";
 import { Button } from "@/components/ui/Button";
 import { hapticLight, hapticSuccess } from "@/lib/haptics";
@@ -98,7 +98,14 @@ function ReviewCardInner({ review, showRestaurant = true, showAuthorLink = true 
             </Pressable>
             <Text className="text-xs text-savr-500 dark:text-savr-400">{formatRelative(review.createdAt)}</Text>
           </View>
-          <Rating value={getReviewOverallRating(review)} size="sm" />
+          <View className="items-end">
+            <Text className="font-bold text-savr-900 dark:text-savr-100 text-sm">
+              {formatUserRating(
+                review.ratingValue ?? getReviewOverallRating(review),
+                review.ratingMax ?? 10,
+              )}
+            </Text>
+          </View>
         </View>
         <ReviewScoreSummary review={review} compact />
         {showRestaurant && restaurant && (

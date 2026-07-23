@@ -15,6 +15,8 @@ import {
 } from "@/lib/maps/pins";
 import { MapPinSheet } from "./MapPinSheet";
 import { MapMarker } from "./MapMarker";
+import { DISCOVER_CAMERA_DEBOUNCE_MS } from "@/lib/discover-tray";
+import type { DiscoverCameraTarget } from "@/lib/discover-search";
 
 export type { MapPin, MapPinType };
 
@@ -59,6 +61,18 @@ function buildRegion(coords: Coordinates, pins: MapPin[]): Region {
   };
 }
 
+function pinMatchesSelection(
+  pin: MapPin,
+  selectedPinId: string | null,
+  restaurants: Restaurant[],
+): boolean {
+  if (!selectedPinId) return false;
+  if (pin.type === "nearby") return pin.id === selectedPinId;
+  if (pin.id === selectedPinId) return true;
+  const rest = restaurants.find((r) => r.id === pin.id);
+  return rest?.googlePlaceId === selectedPinId;
+}
+
 export function DiscoverMap({
   coords,
   restaurants,
@@ -71,6 +85,13 @@ export function DiscoverMap({
   isPinBookmarked,
   searching = false,
   fullScreen = false,
+  showPinSheet = true,
+  onSelectPin,
+  selectedPinId = null,
+  focusCoordinate = null,
+  cameraTarget = null,
+  onMapPress,
+  hideSearchArea = false,
 }: {
   coords: Coordinates;
   restaurants: Restaurant[];
@@ -83,11 +104,22 @@ export function DiscoverMap({
   isPinBookmarked?: (id: string, type: MapPinType) => boolean;
   searching?: boolean;
   fullScreen?: boolean;
+  showPinSheet?: boolean;
+  onSelectPin?: (pin: MapPin | null) => void;
+  selectedPinId?: string | null;
+  /** Legacy tray/pin follow — restaurant-level zoom. */
+  focusCoordinate?: Coordinates | null;
+  /** Explicit search-driven camera (restaurant vs area zoom). */
+  cameraTarget?: DiscoverCameraTarget | null;
+  onMapPress?: () => void;
+  /** Hide floating Search this area while autocomplete is open. */
+  hideSearchArea?: boolean;
 }) {
   const mapRef = useRef<MapView>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
 
   const [layoutReady, setLayoutReady] = useState(false);
@@ -107,6 +139,7 @@ export function DiscoverMap({
       if (saveTimer.current) clearTimeout(saveTimer.current);
       if (pinTimer.current) clearTimeout(pinTimer.current);
       if (markerTimer.current) clearTimeout(markerTimer.current);
+      if (cameraTimer.current) clearTimeout(cameraTimer.current);
     };
   }, []);
 
@@ -127,7 +160,6 @@ export function DiscoverMap({
   const region = useMemo(() => buildRegion(safeCoords, pins), [safeCoords, pins]);
   const initialRegion = savedRegion ?? region;
 
-  // Debounce pin updates so rapid nearby-search refreshes don't thrash native markers.
   useEffect(() => {
     if (!markersReady) return;
     if (pinTimer.current) clearTimeout(pinTimer.current);
@@ -138,6 +170,55 @@ export function DiscoverMap({
       if (pinTimer.current) clearTimeout(pinTimer.current);
     };
   }, [pins, markersReady]);
+
+  useEffect(() => {
+    if (cameraTarget && isValidCoord(cameraTarget.latitude, cameraTarget.longitude)) {
+      const nextRegion = {
+        latitude: cameraTarget.latitude,
+        longitude: cameraTarget.longitude,
+        latitudeDelta: cameraTarget.latitudeDelta,
+        longitudeDelta: cameraTarget.longitudeDelta,
+      };
+      // Keep Search this area in sync with programmatic jumps (don't use stale pan region).
+      setMapRegion(nextRegion);
+      if (cameraTimer.current) clearTimeout(cameraTimer.current);
+      cameraTimer.current = setTimeout(() => {
+        if (!mounted.current) return;
+        mapRef.current?.animateToRegion(nextRegion, 400);
+      }, DISCOVER_CAMERA_DEBOUNCE_MS);
+      return () => {
+        if (cameraTimer.current) clearTimeout(cameraTimer.current);
+      };
+    }
+
+    if (!focusCoordinate || !isValidCoord(focusCoordinate.latitude, focusCoordinate.longitude)) {
+      return;
+    }
+    if (cameraTimer.current) clearTimeout(cameraTimer.current);
+    cameraTimer.current = setTimeout(() => {
+      if (!mounted.current) return;
+      mapRef.current?.animateToRegion(
+        {
+          latitude: focusCoordinate.latitude,
+          longitude: focusCoordinate.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        350,
+      );
+    }, DISCOVER_CAMERA_DEBOUNCE_MS);
+    return () => {
+      if (cameraTimer.current) clearTimeout(cameraTimer.current);
+    };
+  }, [
+    cameraTarget?.token,
+    cameraTarget?.latitude,
+    cameraTarget?.longitude,
+    cameraTarget?.latitudeDelta,
+    cameraTarget?.longitudeDelta,
+    focusCoordinate?.latitude,
+    focusCoordinate?.longitude,
+  ]);
 
   const persistRegion = useCallback((r: Region) => {
     if (!isValidRegion(r)) return;
@@ -161,8 +242,8 @@ export function DiscoverMap({
   };
 
   const handleLayout = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    if (width > 0 && height > 0) setLayoutReady(true);
+    const { width, height: h } = e.nativeEvent.layout;
+    if (width > 0 && h > 0) setLayoutReady(true);
   };
 
   const handleMapReady = useCallback(() => {
@@ -175,16 +256,25 @@ export function DiscoverMap({
     }, MARKER_MOUNT_MS);
   }, [pins]);
 
-  const handleMarkerPress = useCallback((pin: MapPin) => {
-    setSelectedPin(pin);
-  }, []);
+  const handleMarkerPress = useCallback(
+    (pin: MapPin) => {
+      if (showPinSheet) setSelectedPin(pin);
+      onSelectPin?.(pin);
+    },
+    [onSelectPin, showPinSheet],
+  );
 
-  const height = fullScreen ? undefined : 320;
+  const clearSelection = useCallback(() => {
+    setSelectedPin(null);
+    onSelectPin?.(null);
+  }, [onSelectPin]);
+
+  const mapHeight = fullScreen ? undefined : 320;
 
   return (
     <View
       className={fullScreen ? "flex-1" : "rounded-2xl overflow-hidden border border-savr-200 dark:border-savr-700"}
-      style={fullScreen ? { flex: 1 } : { height }}
+      style={fullScreen ? { flex: 1 } : { height: mapHeight }}
       onLayout={handleLayout}
     >
       {layoutReady ? (
@@ -198,6 +288,9 @@ export function DiscoverMap({
           moveOnMarkerPress={false}
           loadingEnabled
           onMapReady={handleMapReady}
+          onPress={() => {
+            onMapPress?.();
+          }}
           onRegionChangeComplete={(r) => {
             setMapRegion(r);
             persistRegion(r);
@@ -205,19 +298,24 @@ export function DiscoverMap({
         >
           {markersReady &&
             renderPins.map((pin) => (
-              <MapMarker key={`${pin.type}-${pin.id}`} pin={pin} onPress={handleMarkerPress} />
+              <MapMarker
+                key={`${pin.type}-${pin.id}`}
+                pin={pin}
+                selected={pinMatchesSelection(pin, selectedPinId, restaurants)}
+                onPress={handleMarkerPress}
+              />
             ))}
         </MapView>
       ) : (
         <View className="flex-1 items-center justify-center bg-savr-100 dark:bg-savr-900">
-          <ActivityIndicator color="#A85D3F" />
+          <ActivityIndicator color="#FF8559" />
         </View>
       )}
 
       {pins.length === 0 && !searching && layoutReady && markersReady && (
         <View className="absolute inset-0 items-center justify-center bg-black/20 px-6 pointer-events-none">
           <View className="bg-white dark:bg-savr-800 rounded-2xl p-4 items-center gap-2 max-w-xs">
-            <Ionicons name="map-outline" size={32} color="#A85D3F" />
+            <Ionicons name="map-outline" size={32} color="#FF8559" />
             <Text className="font-semibold text-savr-900 dark:text-savr-100 text-center">No pins yet</Text>
             <Text className="text-sm text-savr-500 dark:text-savr-400 text-center">
               Pan the map, then tap Search this area.
@@ -226,12 +324,12 @@ export function DiscoverMap({
         </View>
       )}
 
-      {onSearchArea && (
+      {onSearchArea && !hideSearchArea ? (
         <View className="absolute top-3 left-0 right-0 items-center px-4">
           <Pressable
             onPress={handleSearchArea}
             disabled={searching}
-            className="flex-row items-center gap-2 bg-savr-600 rounded-full px-4 py-2.5"
+            className="flex-row items-center gap-2 bg-savr-500 rounded-full px-4 py-2.5"
             style={styles.shadow}
           >
             {searching ? (
@@ -244,32 +342,11 @@ export function DiscoverMap({
             </Text>
           </Pressable>
         </View>
-      )}
-
-      <View
-        className="absolute bottom-3 left-3 right-3 flex-row items-center justify-between"
-        style={{ marginBottom: selectedPin ? 160 : 0 }}
-      >
-        <View className="flex-row gap-2">
-          <View className="flex-row items-center gap-1.5 bg-white/95 dark:bg-savr-900/95 px-2.5 py-1.5 rounded-full">
-            <View className="w-2.5 h-2.5 rounded-full bg-savr-600" />
-            <Text className="text-xs text-savr-700 dark:text-savr-200">Rated</Text>
-          </View>
-          <View className="flex-row items-center gap-1.5 bg-white/95 dark:bg-savr-900/95 px-2.5 py-1.5 rounded-full">
-            <View className="w-2.5 h-2.5 rounded-full bg-savr-400" />
-            <Text className="text-xs text-savr-700 dark:text-savr-200">Nearby</Text>
-          </View>
-        </View>
-        <View className="bg-white/95 dark:bg-savr-900/95 px-2.5 py-1.5 rounded-full">
-          <Text className="text-xs font-semibold text-savr-700 dark:text-savr-200">
-            {truncated ? `${pins.length}+ spots` : `${pins.length} spots`}
-          </Text>
-        </View>
-      </View>
+      ) : null}
 
       <Pressable
         onPress={() => {
-          setSelectedPin(null);
+          clearSelection();
           if (onRecenterUser) {
             onRecenterUser();
             return;
@@ -278,23 +355,24 @@ export function DiscoverMap({
         }}
         className="absolute top-3 right-3 bg-white dark:bg-savr-800 rounded-full p-2"
         style={{ marginTop: onSearchArea ? 48 : 0 }}
+        accessibilityLabel="Recenter map"
       >
-        <Ionicons name="locate" size={20} color="#A85D3F" />
+        <Ionicons name="locate" size={20} color="#FF8559" />
       </Pressable>
 
-      {selectedPin && (
+      {showPinSheet && selectedPin ? (
         <MapPinSheet
           title={selectedPin.title}
           subtitle={selectedPin.subtitle}
           type={selectedPin.type}
           isBookmarked={isPinBookmarked?.(selectedPin.id, selectedPin.type)}
-          onClose={() => setSelectedPin(null)}
+          onClose={clearSelection}
           onView={() => {
-            setSelectedPin(null);
+            clearSelection();
             onPinPress(selectedPin.id, selectedPin.type);
           }}
           onRate={() => {
-            setSelectedPin(null);
+            clearSelection();
             onPinPress(selectedPin.id, selectedPin.type);
           }}
           onBookmark={
@@ -308,7 +386,7 @@ export function DiscoverMap({
               : undefined
           }
         />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -324,4 +402,3 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 });
-

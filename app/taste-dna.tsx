@@ -103,7 +103,7 @@ export default function TasteDNAScreen() {
               {dna.topRestaurants.map((item, i) => (
                 <Pressable key={item.restaurant.id} onPress={() => router.push(`/restaurant/${item.restaurant.id}`)}>
                   <Card className="flex-row items-center gap-3 py-4 px-4">
-                    <Text className="text-2xl font-black text-savr-600 dark:text-savr-400 w-8">{i + 1}</Text>
+                    <Text className="text-2xl font-black text-savr-350 dark:text-savr-400 w-8">{i + 1}</Text>
                     <Text className={`flex-1 font-medium ${ui.text.primary}`}>{item.restaurant.name}</Text>
                     <Rating value={item.rating} size="md" />
                   </Card>

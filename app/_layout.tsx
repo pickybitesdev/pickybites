@@ -31,7 +31,7 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background, gap: 16 }}>
         <Logo size="lg" showName showTagline />
-        <ActivityIndicator size="large" color={brandColors.roseDark} />
+        <ActivityIndicator size="large" color={brandColors.primary} />
       </View>
     );
   }
@@ -48,10 +48,10 @@ export default function RootLayout() {
             gestureEnabled: true,
             headerLeft: (props) => <StackBackButton {...props} />,
             contentStyle: { backgroundColor: colors.background },
-            headerTintColor: resolved === "dark" ? "#F5F0F1" : brandColors.navy,
+            headerTintColor: resolved === "dark" ? "#F5F0F1" : brandColors.textPrimary,
             headerStyle: { backgroundColor: colors.background },
             headerTitleStyle: {
-              color: resolved === "dark" ? "#FAFAFA" : brandColors.navy,
+              color: resolved === "dark" ? "#FAFAFA" : brandColors.textPrimary,
               fontWeight: "600",
             },
             headerShadowVisible: resolved !== "dark",
@@ -67,10 +67,20 @@ export default function RootLayout() {
           <Stack.Screen name="notifications" options={{ headerShown: true, title: "Notifications" }} />
           <Stack.Screen name="bookmarks" options={{ headerShown: true, title: "Bites" }} />
           <Stack.Screen name="(tabs)" options={{ title: APP_NAME }} />
+          <Stack.Screen name="bite/[reviewId]" options={{ headerShown: true, title: "Bite" }} />
           <Stack.Screen name="restaurant/[id]" options={{ headerShown: true, title: "Restaurant" }} />
           <Stack.Screen name="dish/[id]" options={{ headerShown: true, title: "Dish" }} />
           <Stack.Screen name="user/[id]" options={{ headerShown: true, title: "Profile" }} />
           <Stack.Screen name="compare/[id]" options={{ headerShown: true, title: "Compare Rankings" }} />
+          <Stack.Screen
+            name="add-bite"
+            options={{
+              headerShown: true,
+              title: "Add a Bite",
+              presentation: "card",
+              headerLeft: (p) => <StackBackButton {...p} fallback="/(tabs)/discover" />,
+            }}
+          />
           <Stack.Screen name="add-review" options={{ headerShown: true, title: "Add Review", presentation: "modal", headerLeft: (p) => <StackBackButton {...p} fallback="/(tabs)/discover" /> }} />
           <Stack.Screen name="add-dish" options={{ headerShown: true, title: "Add Dish", presentation: "modal", headerLeft: (p) => <StackBackButton {...p} fallback="/(tabs)/discover" /> }} />
           <Stack.Screen name="lists" options={{ headerShown: true, title: "My Lists" }} />
@@ -81,8 +91,10 @@ export default function RootLayout() {
           <Stack.Screen name="taste-dna" options={{ headerShown: true, title: "Taste DNA" }} />
           <Stack.Screen name="taste-unlocked" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="journal" options={{ headerShown: true, title: "Food Journal" }} />
+          {/* Food Wrapped ships later — restore screen registration when the feature launches
           <Stack.Screen name="wrapped" options={{ headerShown: false, title: "Food Wrapped" }} />
-          <Stack.Screen name="settings" options={{ headerShown: true, title: "Settings" }} />
+          */}
+          <Stack.Screen name="settings" options={{ headerShown: true, title: "Settings", headerLeft: (p) => <StackBackButton {...p} fallback="/(tabs)/profile" /> }} />
           <Stack.Screen name="privacy" options={{ headerShown: true, title: "Privacy Policy" }} />
           <Stack.Screen name="terms" options={{ headerShown: true, title: "Terms of Service" }} />
           <Stack.Screen name="edit-profile" options={{ headerShown: true, title: "Edit Profile" }} />

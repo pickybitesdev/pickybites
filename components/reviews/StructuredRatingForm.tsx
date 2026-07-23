@@ -102,7 +102,7 @@ export function StructuredRatingForm({ value, onChange }: Props) {
         </View>
 
         <Pressable onPress={() => setManualOverride(!value.ratingManualOverride)}>
-          <Text className="text-sm font-semibold text-savr-600 dark:text-savr-400">
+          <Text className="text-sm font-semibold text-savr-350 dark:text-savr-400">
             {value.ratingManualOverride ? "Use auto-calculated overall" : "Adjust overall manually"}
           </Text>
         </Pressable>

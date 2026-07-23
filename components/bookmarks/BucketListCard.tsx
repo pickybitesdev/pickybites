@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { formatPrice } from "@/lib/utils";
 import {
   formatBookmarkDistance,
+  formatPlannedFor,
   formatSavedDate,
   getStatusLabel,
 } from "@/lib/bucket-list";
@@ -52,7 +53,7 @@ export function BucketListCard({
             />
           ) : (
             <View className={`w-[88px] h-[108px] items-center justify-center ${ui.surface.muted}`}>
-              <Ionicons name="restaurant" size={28} color="#A85D3F" />
+              <Ionicons name="restaurant" size={28} color="#FF8559" />
             </View>
           )}
 
@@ -62,15 +63,17 @@ export function BucketListCard({
                 {bookmark.placeName}
               </Text>
               {onRemove ? (
-                <Pressable onPress={(e) => { e.stopPropagation?.(); onRemove(); }} hitSlop={8}>
-                  <Ionicons name="close-circle" size={20} color="#B8956F" />
+                <Pressable onPress={(e) => { e?.stopPropagation?.(); onRemove(); }} hitSlop={8}>
+                  <Ionicons name="close-circle" size={20} color="#9D9692" />
                 </Pressable>
               ) : null}
             </View>
 
             <View className={`self-start px-2 py-0.5 rounded-full ${STATUS_STYLES[bookmark.status]}`}>
               <Text className="text-[10px] font-semibold uppercase tracking-wide">
-                {getStatusLabel(bookmark.status)}
+                {bookmark.status === "planned" && formatPlannedFor(bookmark.plannedAt)
+                  ? `Planned · ${formatPlannedFor(bookmark.plannedAt)}`
+                  : getStatusLabel(bookmark.status)}
               </Text>
             </View>
 
@@ -90,19 +93,23 @@ export function BucketListCard({
 
         {bookmark.status !== "visited" && (onMarkPlanned || onMarkVisited) ? (
           <View className={`flex-row gap-2 px-3 pb-3 pt-1 border-t ${ui.border.divider}`}>
-            {bookmark.status === "want_to_try" && onMarkPlanned ? (
+            {onMarkPlanned && bookmark.status !== "visited" ? (
               <Pressable
-                onPress={(e) => { e.stopPropagation?.(); onMarkPlanned(); }}
+                onPress={(e) => { e?.stopPropagation?.(); onMarkPlanned(); }}
                 className={`flex-1 flex-row items-center justify-center gap-1 py-2 rounded-xl ${ui.surface.muted}`}
+                testID="bookmark-plan-visit"
               >
-                <Ionicons name="calendar-outline" size={16} color="#A85D3F" />
-                <Text className={`text-xs font-semibold ${ui.text.secondary}`}>Mark Planned</Text>
+                <Ionicons name="calendar-outline" size={16} color="#FF8559" />
+                <Text className={`text-xs font-semibold ${ui.text.secondary}`}>
+                  {bookmark.status === "planned" ? "Change plan" : "Plan visit"}
+                </Text>
               </Pressable>
             ) : null}
             {onMarkVisited ? (
               <Pressable
-                onPress={(e) => { e.stopPropagation?.(); onMarkVisited(); }}
+                onPress={(e) => { e?.stopPropagation?.(); onMarkVisited(); }}
                 className="flex-1 flex-row items-center justify-center gap-1 py-2 rounded-xl bg-savr-500 dark:bg-savr-600"
+                testID="bookmark-mark-visited"
               >
                 <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
                 <Text className="text-xs font-semibold text-white">Mark Visited</Text>
@@ -115,20 +122,22 @@ export function BucketListCard({
           <View className={`flex-row gap-2 px-3 pb-3 pt-1 border-t ${ui.border.divider}`}>
             {onLeaveReview ? (
               <Pressable
-                onPress={(e) => { e.stopPropagation?.(); onLeaveReview(); }}
+                onPress={(e) => { e?.stopPropagation?.(); onLeaveReview(); }}
                 className="flex-1 flex-row items-center justify-center gap-1 py-2 rounded-xl bg-savr-500 dark:bg-savr-600"
+                testID="bookmark-add-bite"
               >
                 <Ionicons name="create-outline" size={16} color="#fff" />
-                <Text className="text-xs font-semibold text-white">Leave Review</Text>
+                <Text className="text-xs font-semibold text-white">Add a Bite</Text>
               </Pressable>
             ) : null}
             {onMoveToWantToTry ? (
               <Pressable
-                onPress={(e) => { e.stopPropagation?.(); onMoveToWantToTry(); }}
+                onPress={(e) => { e?.stopPropagation?.(); onMoveToWantToTry(); }}
                 className={`flex-1 flex-row items-center justify-center gap-1 py-2 rounded-xl ${ui.surface.muted}`}
+                testID="bookmark-move-try-next"
               >
-                <Ionicons name="arrow-undo-outline" size={16} color="#A85D3F" />
-                <Text className={`text-xs font-semibold ${ui.text.secondary}`}>Want To Try</Text>
+                <Ionicons name="arrow-undo-outline" size={16} color="#FF8559" />
+                <Text className={`text-xs font-semibold ${ui.text.secondary}`}>Try Next</Text>
               </Pressable>
             ) : null}
           </View>

@@ -38,7 +38,7 @@ export default function Onboarding() {
         <View className="gap-4">
           {slides.map((s) => (
             <View key={s.title} className="flex-row gap-4 bg-white dark:bg-savr-800 rounded-2xl p-4 border border-savr-100 dark:border-savr-700">
-              <Ionicons name={s.icon} size={24} color={brandColors.roseDark} />
+              <Ionicons name={s.icon} size={24} color={brandColors.primary} />
               <View className="flex-1">
                 <Text className="font-semibold text-savr-900 dark:text-savr-100">{s.title}</Text>
                 <Text className="text-sm text-savr-500 dark:text-savr-400 mt-0.5">{s.desc}</Text>

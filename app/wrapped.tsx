@@ -142,7 +142,7 @@ export default function WrappedScreen() {
             title="No wrapped data yet"
             description={`Log reviews for this ${periodType === "month" ? "month" : periodType === "year" ? "year" : "period"} to unlock your Food Wrapped.`}
             actionLabel="Write a Review"
-            onAction={() => router.push("/add-review")}
+            onAction={() => router.push("/add-bite")}
           />
         </View>
       ) : (

@@ -52,9 +52,17 @@ export function normalizeCategoryScores(
   };
 }
 
-/** Canonical overall score for rankings, journal averages, and profile stats. */
+/** Canonical overall score for rankings, journal averages, and profile stats (1–10 legacy). */
 export function getReviewOverallRating(review: Review): number {
   return clampRating(review.rating);
+}
+
+/** 0–100 normalized rating for PickyBites community score. */
+export function getNormalizedRating(review: Review): number {
+  if (typeof review.normalizedRating === "number" && Number.isFinite(review.normalizedRating)) {
+    return Math.min(100, Math.max(0, review.normalizedRating));
+  }
+  return Math.min(100, Math.max(0, Math.round(clampRating(review.rating) * 10 * 100) / 100));
 }
 
 export function averageCategoryScore(

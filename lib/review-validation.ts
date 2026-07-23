@@ -1,11 +1,22 @@
-import type { Cuisine, PriceLevel, ReviewCategoryScores, ReviewTag, WaitTime } from "./types";
+import type {
+  Cuisine,
+  PriceLevel,
+  ReviewCategoryScores,
+  ReviewTag,
+  ReviewVisibility,
+  WaitTime,
+} from "./types";
 import { validateCategoryScores } from "./review-scores";
+import { validateRatingScale } from "./rating-scale";
 
 export type ReviewSubmitPayload = {
   restaurantName?: string;
   restaurantId?: string;
   placeName?: string;
   rating: number;
+  ratingValue?: number;
+  ratingMax?: number;
+  visibility?: ReviewVisibility;
   categoryScores: ReviewCategoryScores;
   ratingManualOverride?: boolean;
   waitTime?: WaitTime | null;
@@ -18,12 +29,19 @@ export type ReviewSubmitPayload = {
   state?: string;
   priceLevel?: PriceLevel;
   tags: ReviewTag[];
-  dishes: { name: string; rating: number; notes?: string; isBestDish?: boolean }[];
+  dishes: {
+    name: string;
+    rating: number;
+    ratingValue?: number;
+    ratingMax?: number;
+    notes?: string;
+    isBestDish?: boolean;
+  }[];
 };
 
 export type ReviewValidationResult = { ok: true } | { ok: false; error: string };
 
-const MAX_REVIEW_TEXT = 500;
+const MAX_REVIEW_TEXT = 750;
 
 export function validateReviewSubmit(data: ReviewSubmitPayload): ReviewValidationResult {
   const hasRestaurant =
@@ -40,8 +58,21 @@ export function validateReviewSubmit(data: ReviewSubmitPayload): ReviewValidatio
     return { ok: false, error: categoryError };
   }
 
-  if (!Number.isFinite(data.rating) || data.rating < 1 || data.rating > 10) {
-    return { ok: false, error: "Overall rating must be between 1.0 and 10.0." };
+  const ratingMax = data.ratingMax ?? 10;
+  const ratingValue = data.ratingValue ?? data.rating;
+  const scale = validateRatingScale(ratingValue, ratingMax);
+  if (!scale.ok) {
+    return { ok: false, error: scale.error };
+  }
+
+  if (data.ratingValue == null && data.ratingMax == null) {
+    if (!Number.isFinite(data.rating) || data.rating < 1 || data.rating > 10) {
+      return { ok: false, error: "Overall rating must be between 1.0 and 10.0." };
+    }
+  }
+
+  if (data.visibility && !["private", "friends", "public"].includes(data.visibility)) {
+    return { ok: false, error: "Invalid visibility." };
   }
 
   if (!data.visitDate?.trim()) {
@@ -58,8 +89,11 @@ export function validateReviewSubmit(data: ReviewSubmitPayload): ReviewValidatio
 
   for (const dish of data.dishes) {
     if (!dish.name.trim()) continue;
-    if (!Number.isFinite(dish.rating) || dish.rating < 1 || dish.rating > 10) {
-      return { ok: false, error: `Dish rating for "${dish.name}" must be between 1.0 and 10.0.` };
+    const dMax = dish.ratingMax ?? ratingMax;
+    const dVal = dish.ratingValue ?? dish.rating;
+    const dishScale = validateRatingScale(dVal, dMax);
+    if (!dishScale.ok) {
+      return { ok: false, error: `Dish rating for "${dish.name}": ${dishScale.error}` };
     }
   }
 

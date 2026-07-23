@@ -1,6 +1,6 @@
 import { getSupabase } from "./client";
-import { mapBookmark } from "./mappers";
-import type { Bookmark, BucketListStatus } from "@/lib/types";
+import { mapBookmark, mapFavorite } from "./mappers";
+import type { Bookmark, BucketListStatus, Favorite } from "@/lib/types";
 import type { PlaceResult } from "@/lib/places/types";
 
 export async function fetchBookmarks(userId: string): Promise<Bookmark[]> {
@@ -137,5 +137,54 @@ export async function removeBookmarkByPlaceIdDb(userId: string, googlePlaceId: s
     .delete()
     .eq("user_id", userId)
     .eq("google_place_id", googlePlaceId);
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchFavorites(userId: string): Promise<Favorite[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("favorites")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    const m = error.message.toLowerCase();
+    if (m.includes("favorites") || m.includes("does not exist") || m.includes("schema cache")) {
+      return [];
+    }
+    throw new Error(error.message);
+  }
+  return (data ?? []).map(mapFavorite);
+}
+
+export async function addRestaurantFavorite(userId: string, restaurantId: string): Promise<Favorite> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase
+    .from("favorites")
+    .insert({ user_id: userId, restaurant_id: restaurantId, dish_id: null })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return mapFavorite(data);
+}
+
+export async function addDishFavorite(userId: string, dishId: string): Promise<Favorite> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase
+    .from("favorites")
+    .insert({ user_id: userId, restaurant_id: null, dish_id: dishId })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return mapFavorite(data);
+}
+
+export async function removeFavorite(favoriteId: string): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.from("favorites").delete().eq("id", favoriteId);
   if (error) throw new Error(error.message);
 }

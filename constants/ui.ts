@@ -5,8 +5,8 @@ export const ui = {
   screen: "bg-savr-50 dark:bg-savr-950",
   text: {
     primary: "text-savr-900 dark:text-savr-50",
-    secondary: "text-savr-600 dark:text-savr-200",
-    muted: "text-savr-500 dark:text-savr-400",
+    secondary: "text-savr-350 dark:text-savr-200",
+    muted: "text-savr-400 dark:text-savr-400",
     faint: "text-savr-400 dark:text-savr-500",
   },
   surface: {
@@ -26,10 +26,10 @@ export const ui = {
 } as const;
 
 export const iconColors = {
-  brand: brandColors.roseDark,
-  brandDark: brandColors.roseLight,
-  muted: brandColors.greyLight,
-  mutedDark: brandColors.grey,
-  star: brandColors.rose,
-  starDark: brandColors.roseLight,
+  brand: brandColors.primary,
+  brandDark: brandColors.primaryOnDark,
+  muted: brandColors.iconInactive,
+  mutedDark: brandColors.iconInactive,
+  star: brandColors.primary,
+  starDark: brandColors.primaryOnDark,
 } as const;

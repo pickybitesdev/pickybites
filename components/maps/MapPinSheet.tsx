@@ -55,7 +55,7 @@ export function MapPinSheet({
           {subtitle ? <Text className="text-sm text-savr-500 dark:text-savr-400 mt-0.5">{subtitle}</Text> : null}
         </View>
         <Pressable onPress={onClose} className="p-2">
-          <Ionicons name="close" size={22} color="#B8956F" />
+          <Ionicons name="close" size={22} color="#9D9692" />
         </Pressable>
       </View>
 
@@ -80,7 +80,7 @@ export function MapPinSheet({
       </View>
       {type === "rated" && (
         <Pressable onPress={onView}>
-          <Text className="text-sm text-savr-600 dark:text-savr-300 text-center">Open restaurant page →</Text>
+          <Text className="text-sm text-savr-350 dark:text-savr-300 text-center">Open restaurant page →</Text>
         </Pressable>
       )}
     </View>

@@ -1,5 +1,6 @@
 import type { Coordinates, PlaceResult } from "./types";
 import { distanceMeters } from "@/lib/location";
+import { DISCOVER_RESULT_LIMIT } from "@/lib/discover-results";
 
 export const METERS_PER_MILE = 1609.34;
 export const MAX_DISCOVER_RADIUS_METERS = Math.round(METERS_PER_MILE * 10);
@@ -7,11 +8,9 @@ export const MAX_DISCOVER_RADIUS_METERS = Math.round(METERS_PER_MILE * 10);
 const CARDINAL = [0, 90, 180, 270] as const;
 const OCTANT = [0, 45, 90, 135, 180, 225, 270, 315] as const;
 
-export function mergeLimitForRadius(radiusMeters: number): number {
-  if (radiusMeters >= 14000) return 150;
-  if (radiusMeters >= 8000) return 120;
-  if (radiusMeters >= 4500) return 100;
-  return 80;
+/** Discover map/tray hard ceiling — never merge more than this many places. */
+export function mergeLimitForRadius(_radiusMeters: number): number {
+  return DISCOVER_RESULT_LIMIT;
 }
 
 export type NearbySearchRequest = {

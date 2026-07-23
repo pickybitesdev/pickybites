@@ -10,6 +10,13 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
+        // Floating absolute tab — scene goes edge-to-edge; trays clear via trayBottomOffset.
+        tabBarStyle: {
+          position: "absolute",
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+        },
       }}
     >
       {TAB_DEFINITIONS.map((tab) => {

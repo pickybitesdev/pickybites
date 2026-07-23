@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, ScrollView, Pressable, Image, Alert } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useAppStore } from "@/store/useAppStore";
 import { REVIEW_TAGS, type ReviewTag } from "@/lib/types";
@@ -34,11 +34,35 @@ interface DishForm {
   isBestDish: boolean;
 }
 
+/** New reviews go through Add a Bite; this screen remains for editing existing reviews. */
 export default function AddReviewScreen() {
   const { restaurantId: paramRestaurantId, reviewId: paramReviewId } = useLocalSearchParams<{
     restaurantId?: string;
     reviewId?: string;
   }>();
+
+  if (!paramReviewId) {
+    return (
+      <Redirect
+        href={
+          paramRestaurantId
+            ? { pathname: "/add-bite", params: { restaurantId: paramRestaurantId } }
+            : "/add-bite"
+        }
+      />
+    );
+  }
+
+  return <EditReviewScreen reviewId={paramReviewId} restaurantId={paramRestaurantId} />;
+}
+
+function EditReviewScreen({
+  reviewId: paramReviewId,
+  restaurantId: paramRestaurantId,
+}: {
+  reviewId: string;
+  restaurantId?: string;
+}) {
   const addReview = useAppStore((s) => s.addReview);
   const updateReview = useAppStore((s) => s.updateReview);
   const reviews = useAppStore((s) => s.reviews);
@@ -242,7 +266,7 @@ export default function AddReviewScreen() {
                   </Text>
                 </View>
                 <Pressable onPress={() => { setSelectedPlace(null); setSelectedRestaurantId(null); }} className="p-2">
-                  <Ionicons name="close-circle" size={24} color="#B8956F" />
+                  <Ionicons name="close-circle" size={24} color="#9D9692" />
                 </Pressable>
               </View>
             </Card>
@@ -287,7 +311,7 @@ export default function AddReviewScreen() {
         <View className="gap-4">
           <Text className={`text-2xl font-bold ${ui.text.primary}`}>Add photos</Text>
           <Pressable onPress={pickPhoto} className="border border-dashed border-savr-300 dark:border-savr-600 rounded-2xl p-8 items-center">
-            <Ionicons name="camera" size={32} color="#A85D3F" />
+            <Ionicons name="camera" size={32} color="#FF8559" />
             <Text className={`mt-2 ${ui.text.secondary}`}>Tap to add photos</Text>
           </Pressable>
           {photos.map((uri, i) => (

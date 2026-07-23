@@ -17,8 +17,12 @@ export function getRestaurantRatingsBreakdown(
   follows: Follow[],
   getUser: (id: string) => User | undefined
 ): RestaurantRatingsBreakdown {
-  const all = reviews.filter((r) => r.restaurantId === restaurantId);
-  const yours = currentUserId ? all.find((r) => r.userId === currentUserId) : undefined;
+  const all = reviews.filter(
+    (r) => r.restaurantId === restaurantId && r.visibility !== "private",
+  );
+  const yours = currentUserId
+    ? reviews.find((r) => r.restaurantId === restaurantId && r.userId === currentUserId)
+    : undefined;
   const friendIds = currentUserId
     ? follows.filter((f) => f.followerId === currentUserId).map((f) => f.followingId)
     : [];

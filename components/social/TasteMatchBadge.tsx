@@ -23,7 +23,7 @@ export function TasteMatchBadge({
 
   const textColor =
     percent >= 80 ? "text-emerald-800 dark:text-emerald-200" :
-    percent >= 60 ? "text-savr-800 dark:text-savr-200" :
+    percent >= 60 ? "text-savr-500 dark:text-savr-200" :
     "text-amber-800 dark:text-amber-200";
 
   const percentSize = size === "lg" ? "text-3xl" : size === "md" ? "text-xl" : "text-base";
@@ -36,7 +36,7 @@ export function TasteMatchBadge({
         <Ionicons
           name="heart"
           size={size === "lg" ? 20 : 16}
-          color={percent >= 80 ? "#059669" : percent >= 60 ? "#A85D3F" : "#D97706"}
+          color={percent >= 80 ? "#2FA866" : percent >= 60 ? "#FF8559" : "#E9A23B"}
         />
         <View className="flex-row items-baseline gap-1.5">
           <Text className={cn(percentSize, "font-black", textColor)}>{percent}%</Text>

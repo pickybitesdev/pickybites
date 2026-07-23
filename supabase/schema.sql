@@ -17,6 +17,20 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- If a prior partial run left `users` without a PK, FKs fail with 42830.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'users'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.users'::regclass AND contype = 'p'
+  ) THEN
+    ALTER TABLE public.users ADD PRIMARY KEY (id);
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS restaurants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   google_place_id TEXT UNIQUE,
@@ -36,6 +50,10 @@ CREATE TABLE IF NOT EXISTS reviews (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
   rating DECIMAL(3,1) NOT NULL CHECK (rating BETWEEN 1.0 AND 10.0),
+  rating_value DECIMAL(8,2) NOT NULL,
+  rating_max INTEGER NOT NULL CHECK (rating_max BETWEEN 5 AND 1000),
+  normalized_rating DECIMAL(5,2) NOT NULL CHECK (normalized_rating BETWEEN 0 AND 100),
+  visibility TEXT NOT NULL DEFAULT 'friends' CHECK (visibility IN ('private', 'friends', 'public')),
   food_quality DECIMAL(3,1) CHECK (food_quality BETWEEN 1.0 AND 10.0),
   service_score DECIMAL(3,1) CHECK (service_score BETWEEN 1.0 AND 10.0),
   atmosphere DECIMAL(3,1) CHECK (atmosphere BETWEEN 1.0 AND 10.0),
@@ -56,10 +74,25 @@ CREATE TABLE IF NOT EXISTS dishes (
   restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   rating DECIMAL(3,1) NOT NULL CHECK (rating BETWEEN 1.0 AND 10.0),
+  rating_value DECIMAL(8,2) NOT NULL,
+  rating_max INTEGER NOT NULL CHECK (rating_max BETWEEN 5 AND 1000),
+  normalized_rating DECIMAL(5,2) NOT NULL CHECK (normalized_rating BETWEEN 0 AND 100),
   notes TEXT DEFAULT '',
   photo_url TEXT,
   is_best_dish BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS review_comparisons (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+  current_restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  compared_restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  preference TEXT NOT NULL CHECK (preference IN ('current', 'compared', 'equal')),
+  reason TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (review_id)
 );
 
 CREATE TABLE IF NOT EXISTS review_photos (
@@ -112,7 +145,28 @@ CREATE TABLE IF NOT EXISTS list_items (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS favorites (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  restaurant_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
+  dish_id UUID REFERENCES dishes(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  CHECK (
+    (restaurant_id IS NOT NULL AND dish_id IS NULL)
+    OR (restaurant_id IS NULL AND dish_id IS NOT NULL)
+  )
+);
+
 -- ─── Indexes ──────────────────────────────────────────────────────────────────
+
+CREATE UNIQUE INDEX IF NOT EXISTS favorites_user_restaurant_uidx
+  ON favorites (user_id, restaurant_id)
+  WHERE restaurant_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS favorites_user_dish_uidx
+  ON favorites (user_id, dish_id)
+  WHERE dish_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS favorites_user_created_idx
+  ON favorites (user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id);
 CREATE INDEX IF NOT EXISTS idx_restaurants_google_place_id ON restaurants(google_place_id);
@@ -178,6 +232,8 @@ ALTER TABLE likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE list_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE review_comparisons ENABLE ROW LEVEL SECURITY;
 
 -- Users
 CREATE POLICY "profiles_select" ON users FOR SELECT TO authenticated USING (true);
@@ -188,24 +244,81 @@ CREATE POLICY "restaurants_select" ON restaurants FOR SELECT TO authenticated US
 CREATE POLICY "restaurants_insert" ON restaurants FOR INSERT TO authenticated WITH CHECK (true);
 
 -- Reviews
-CREATE POLICY "reviews_select" ON reviews FOR SELECT TO authenticated USING (true);
+CREATE POLICY "reviews_select_visibility" ON reviews
+  FOR SELECT TO authenticated
+  USING (
+    auth.uid() = user_id
+    OR visibility = 'public'
+    OR (
+      visibility = 'friends'
+      AND EXISTS (
+        SELECT 1 FROM follows f
+        WHERE f.follower_id = auth.uid()
+          AND f.following_id = reviews.user_id
+      )
+    )
+  );
 CREATE POLICY "reviews_insert" ON reviews FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "reviews_update_own" ON reviews FOR UPDATE TO authenticated USING (auth.uid() = user_id);
 CREATE POLICY "reviews_delete_own" ON reviews FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
--- Dishes
-CREATE POLICY "dishes_select" ON dishes FOR SELECT TO authenticated USING (true);
+-- Dishes (visibility follows parent review)
+CREATE POLICY "dishes_select_visibility" ON dishes
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM reviews r
+      WHERE r.id = dishes.review_id
+        AND (
+          r.user_id = auth.uid()
+          OR r.visibility = 'public'
+          OR (
+            r.visibility = 'friends'
+            AND EXISTS (
+              SELECT 1 FROM follows f
+              WHERE f.follower_id = auth.uid() AND f.following_id = r.user_id
+            )
+          )
+        )
+    )
+  );
 CREATE POLICY "dishes_insert" ON dishes FOR INSERT TO authenticated
   WITH CHECK (EXISTS (SELECT 1 FROM reviews r WHERE r.id = review_id AND r.user_id = auth.uid()));
 CREATE POLICY "dishes_delete_own" ON dishes FOR DELETE TO authenticated
   USING (EXISTS (SELECT 1 FROM reviews r WHERE r.id = review_id AND r.user_id = auth.uid()));
 
--- Review photos
-CREATE POLICY "review_photos_select" ON review_photos FOR SELECT TO authenticated USING (true);
+-- Review photos (visibility follows parent review)
+CREATE POLICY "review_photos_select_visibility" ON review_photos
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM reviews r
+      WHERE r.id = review_photos.review_id
+        AND (
+          r.user_id = auth.uid()
+          OR r.visibility = 'public'
+          OR (
+            r.visibility = 'friends'
+            AND EXISTS (
+              SELECT 1 FROM follows f
+              WHERE f.follower_id = auth.uid() AND f.following_id = r.user_id
+            )
+          )
+        )
+    )
+  );
 CREATE POLICY "review_photos_insert" ON review_photos FOR INSERT TO authenticated
   WITH CHECK (EXISTS (SELECT 1 FROM reviews r WHERE r.id = review_id AND r.user_id = auth.uid()));
 CREATE POLICY "review_photos_delete_own" ON review_photos FOR DELETE TO authenticated
   USING (EXISTS (SELECT 1 FROM reviews r WHERE r.id = review_id AND r.user_id = auth.uid()));
+
+-- Favorites (owner-only)
+CREATE POLICY "favorites_select_own" ON favorites
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "favorites_insert_own" ON favorites
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "favorites_delete_own" ON favorites
+  FOR DELETE TO authenticated USING (auth.uid() = user_id);
 
 -- Follows
 CREATE POLICY "follows_select" ON follows FOR SELECT TO authenticated USING (true);
