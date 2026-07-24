@@ -147,6 +147,29 @@ interface AppState {
     status: Bookmark["status"],
     opts?: { plannedAt?: string; visitedAt?: string; restaurantId?: string | null },
   ) => Promise<{ ok: true; restaurantId: string | null } | { ok: false; error: string }>;
+  saveShareToTryNext: (opts: {
+    placeName: string;
+    placeAddress?: string;
+    placeCity?: string;
+    placeCuisine?: string | null;
+    placeImageUrl?: string | null;
+    placePriceLevel?: number | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    googlePlaceId?: string | null;
+    restaurantId?: string | null;
+    note?: string | null;
+    linkOnly?: boolean;
+    sourcePlatform: import("@/lib/types").ShareSourcePlatform;
+    sourceUrl: string;
+    canonicalUrl: string;
+    sourceTitle?: string | null;
+    sourceThumbnailUrl?: string | null;
+  }) => Promise<
+    | { ok: true; bookmark: Bookmark; alreadyExisted: boolean }
+    | { ok: false; error: string }
+  >;
+  removeSavedSource: (sourceId: string, bookmarkId: string) => Promise<AuthResult>;
   updateReviewVisibility: (reviewId: string, visibility: ReviewVisibility) => Promise<AuthResult>;
   toggleRestaurantFavorite: (restaurantId: string) => Promise<AuthResult>;
   toggleDishFavorite: (dishId: string) => Promise<AuthResult>;
@@ -1152,6 +1175,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       visitedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      createdVia: "discover",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
     };
     set((s) => ({ bookmarks: [tempBookmark, ...s.bookmarks] }));
 
@@ -1187,6 +1216,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       visitedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      createdVia: "discover",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
     };
     set((s) => ({
       bookmarks: [bookmark, ...s.bookmarks.filter((b) => b.id !== tempBookmark.id)],
@@ -1244,6 +1279,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       visitedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      createdVia: "restaurant",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
     };
     set((s) => ({ bookmarks: [bookmark, ...s.bookmarks] }));
     return { ok: true };
@@ -1259,6 +1300,140 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     set((s) => ({ bookmarks: s.bookmarks.filter((b) => b.id !== bookmarkId) }));
+  },
+
+  saveShareToTryNext: async (opts) => {
+    const uid = get().currentUserId;
+    if (!uid) return { ok: false, error: "Not signed in" };
+
+    const source = {
+      sourceUrl: opts.sourceUrl,
+      canonicalUrl: opts.canonicalUrl,
+      sourcePlatform: opts.sourcePlatform,
+      title: opts.sourceTitle ?? null,
+      thumbnailUrl: opts.sourceThumbnailUrl ?? null,
+    };
+
+    if (get().useSupabase) {
+      try {
+        const result = await tier2.saveShareBookmarkDb({
+          userId: uid,
+          placeName: opts.placeName,
+          placeAddress: opts.placeAddress,
+          placeCity: opts.placeCity,
+          placeCuisine: opts.placeCuisine,
+          placeImageUrl: opts.placeImageUrl,
+          placePriceLevel: opts.placePriceLevel,
+          latitude: opts.latitude,
+          longitude: opts.longitude,
+          googlePlaceId: opts.linkOnly ? null : opts.googlePlaceId ?? null,
+          restaurantId: opts.linkOnly ? null : opts.restaurantId ?? null,
+          note: opts.note,
+          createdVia: "share_extension",
+          resolutionStatus: opts.linkOnly ? "link_only" : "linked",
+          sourcePlatform: opts.sourcePlatform,
+          sourceTitle: opts.sourceTitle,
+          sourceThumbnailUrl: opts.sourceThumbnailUrl,
+          source,
+        });
+        set((s) => ({
+          bookmarks: [
+            result.bookmark,
+            ...s.bookmarks.filter((b) => b.id !== result.bookmark.id),
+          ],
+        }));
+        return { ok: true, bookmark: result.bookmark, alreadyExisted: result.alreadyExisted };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "Could not save bookmark" };
+      }
+    }
+
+    // Demo / offline path
+    const existing = get().bookmarks.find(
+      (b) =>
+        (!opts.linkOnly &&
+          opts.googlePlaceId &&
+          b.googlePlaceId === opts.googlePlaceId) ||
+        (!opts.linkOnly && opts.restaurantId && b.restaurantId === opts.restaurantId),
+    );
+
+    const sourceRow = {
+      id: generateId("src"),
+      savedRestaurantId: existing?.id ?? generateId("bm"),
+      userId: uid,
+      sourceUrl: opts.sourceUrl,
+      canonicalUrl: opts.canonicalUrl,
+      sourcePlatform: opts.sourcePlatform,
+      title: opts.sourceTitle ?? null,
+      thumbnailUrl: opts.sourceThumbnailUrl ?? null,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (existing) {
+      const updated: Bookmark = {
+        ...existing,
+        sources: [
+          sourceRow,
+          ...existing.sources.filter((s) => s.canonicalUrl !== opts.canonicalUrl),
+        ],
+        sourcePlatform: opts.sourcePlatform,
+        primarySourceTitle: opts.sourceTitle ?? existing.primarySourceTitle,
+        primarySourceThumbnailUrl:
+          opts.sourceThumbnailUrl ?? existing.primarySourceThumbnailUrl,
+        updatedAt: new Date().toISOString(),
+      };
+      set((s) => ({
+        bookmarks: s.bookmarks.map((b) => (b.id === existing.id ? updated : b)),
+      }));
+      return { ok: true, bookmark: updated, alreadyExisted: true };
+    }
+
+    const bookmark: Bookmark = {
+      id: sourceRow.savedRestaurantId,
+      userId: uid,
+      restaurantId: opts.linkOnly ? null : opts.restaurantId ?? null,
+      googlePlaceId: opts.linkOnly ? null : opts.googlePlaceId ?? null,
+      placeName: opts.placeName,
+      placeAddress: opts.placeAddress ?? "",
+      placeCity: opts.placeCity ?? "",
+      placeCuisine: (opts.placeCuisine as Bookmark["placeCuisine"]) ?? null,
+      placePriceLevel: (opts.placePriceLevel as Bookmark["placePriceLevel"]) ?? null,
+      placeImageUrl: opts.placeImageUrl ?? null,
+      latitude: opts.latitude ?? null,
+      longitude: opts.longitude ?? null,
+      status: "want_to_try",
+      reasonSaved: opts.note?.trim() || `Saved from ${opts.sourcePlatform}`,
+      plannedAt: null,
+      visitedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdVia: "share_extension",
+      resolutionStatus: opts.linkOnly ? "link_only" : "linked",
+      sourcePlatform: opts.sourcePlatform,
+      primarySourceTitle: opts.sourceTitle ?? null,
+      primarySourceThumbnailUrl: opts.sourceThumbnailUrl ?? null,
+      sources: [sourceRow],
+    };
+    set((s) => ({ bookmarks: [bookmark, ...s.bookmarks] }));
+    return { ok: true, bookmark, alreadyExisted: false };
+  },
+
+  removeSavedSource: async (sourceId, bookmarkId) => {
+    if (get().useSupabase) {
+      try {
+        await tier2.removeSavedItemSourceDb(sourceId);
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "Could not remove link" };
+      }
+    }
+    set((s) => ({
+      bookmarks: s.bookmarks.map((b) =>
+        b.id === bookmarkId
+          ? { ...b, sources: b.sources.filter((src) => src.id !== sourceId) }
+          : b,
+      ),
+    }));
+    return { ok: true };
   },
 
   updateBookmarkStatus: async (bookmarkId, status, opts) => {

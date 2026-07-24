@@ -3,7 +3,11 @@ import { View, ActivityIndicator } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { brandColors } from "@/constants/branding";
 import { useAppStore } from "@/store/useAppStore";
-import { resolveEntryRoute, type EntryRoute } from "@/lib/navigation";
+import { resolveEntryRoute } from "@/lib/navigation";
+import {
+  getActivePendingShareId,
+  listPendingShares,
+} from "@/lib/share-intake/pending-queue";
 
 export default function Index() {
   const router = useRouter();
@@ -16,18 +20,29 @@ export default function Index() {
   const hasCompletedTasteQuiz = useAppStore(
     (s) => s.users.find((u) => u.id === s.currentUserId)?.hasCompletedTasteQuiz ?? false,
   );
-  const lastRoute = useRef<EntryRoute | null>(null);
+  const lastRoute = useRef<string | null>(null);
 
   useEffect(() => {
     if (isInitializing || !isOnEntryScreen) return;
     // Wait for profile data before deciding taste quiz vs home (avoids false "quiz incomplete").
     if (isAuthenticated && !isDataLoaded) return;
 
-    const target = resolveEntryRoute(hasSeenOnboarding, isAuthenticated, hasCompletedTasteQuiz);
-    if (lastRoute.current === target) return;
+    void (async () => {
+      const activeId = await getActivePendingShareId();
+      const pending = activeId ?? (await listPendingShares())[0]?.id;
+      if (pending && isAuthenticated) {
+        const target = `/share-import?pendingId=${pending}`;
+        if (lastRoute.current === target) return;
+        lastRoute.current = target;
+        router.replace({ pathname: "/share-import", params: { pendingId: pending } });
+        return;
+      }
 
-    lastRoute.current = target;
-    router.replace(target);
+      const target = resolveEntryRoute(hasSeenOnboarding, isAuthenticated, hasCompletedTasteQuiz);
+      if (lastRoute.current === target) return;
+      lastRoute.current = target;
+      router.replace(target);
+    })();
   }, [
     isInitializing,
     isOnEntryScreen,

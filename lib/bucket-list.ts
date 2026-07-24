@@ -102,10 +102,12 @@ export function formatPlannedFor(iso: string | null | undefined): string | null 
   if (!iso) return null;
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 

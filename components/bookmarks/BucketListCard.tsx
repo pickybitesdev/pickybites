@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import type { Bookmark, BucketListStatus } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
+import { SavedSourcesSheet } from "@/components/share/SavedSourcesSheet";
+import { openOriginalSource } from "@/lib/share-intake/open-source";
+import { track } from "@/lib/analytics";
 import { formatPrice } from "@/lib/utils";
 import {
   formatBookmarkDistance,
@@ -12,6 +16,25 @@ import {
 } from "@/lib/bucket-list";
 import type { Coordinates } from "@/lib/places/types";
 import { ui } from "@/constants/ui";
+
+function sourceLine(bookmark: Bookmark): string | null {
+  const sources = bookmark.sources ?? [];
+  if (sources.length > 1) return `${sources.length} inspiration links`;
+  const platform = sources[0]?.sourcePlatform ?? bookmark.sourcePlatform;
+  if (!platform) return null;
+  const labels: Record<string, string> = {
+    instagram: "Instagram",
+    tiktok: "TikTok",
+    youtube: "YouTube",
+    facebook: "Facebook",
+    google_maps: "Google Maps",
+    yelp: "Yelp",
+    restaurant_website: "Website",
+    web: "Web",
+    unknown: "link",
+  };
+  return `Saved from ${labels[platform] ?? "link"}`;
+}
 
 const STATUS_STYLES: Record<BucketListStatus, string> = {
   want_to_try: "bg-savr-100 dark:bg-savr-800 text-savr-700 dark:text-savr-200",
@@ -40,8 +63,12 @@ export function BucketListCard({
 }) {
   const distance = formatBookmarkDistance(bookmark, coords);
   const price = bookmark.placePriceLevel ? formatPrice(bookmark.placePriceLevel) : null;
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const fromLine = sourceLine(bookmark);
+  const sources = bookmark.sources ?? [];
 
   return (
+    <>
     <Pressable onPress={onPress}>
       <Card className="p-0 overflow-hidden">
         <View className="flex-row gap-3">
@@ -84,6 +111,33 @@ export function BucketListCard({
             <Text className={`text-xs ${ui.text.faint}`}>
               Saved {formatSavedDate(bookmark.createdAt)}
             </Text>
+
+            {fromLine ? (
+              <Pressable
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  if (sources.length === 1) {
+                    track("original_source_opened", {
+                      platform: sources[0].sourcePlatform,
+                    });
+                    void openOriginalSource(sources[0].sourceUrl);
+                  } else {
+                    setSourcesOpen(true);
+                  }
+                }}
+                hitSlop={6}
+              >
+                <Text className={`text-xs font-medium text-savr-500`} numberOfLines={1}>
+                  {fromLine}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {bookmark.resolutionStatus === "link_only" ? (
+              <Text className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                Restaurant not linked
+              </Text>
+            ) : null}
 
             <Text className={`text-xs italic ${ui.text.secondary}`} numberOfLines={2}>
               &ldquo;{bookmark.reasonSaved}&rdquo;
@@ -144,5 +198,14 @@ export function BucketListCard({
         ) : null}
       </Card>
     </Pressable>
+    {sourcesOpen ? (
+      <SavedSourcesSheet
+        visible={sourcesOpen}
+        bookmarkId={bookmark.id}
+        sources={sources}
+        onClose={() => setSourcesOpen(false)}
+      />
+    ) : null}
+    </>
   );
 }

@@ -6,7 +6,6 @@ import {
 } from "@/lib/bites-filters";
 import type { BitesSegment } from "@/lib/bites";
 import type {
-  FavoritesSort,
   JournalSort,
   ListsSort,
   WantToTrySort,
@@ -21,7 +20,6 @@ export function useBitesFilters() {
   const [sortOpen, setSortOpen] = useState(false);
   const [journalSort, setJournalSort] = useState<JournalSort>("newest");
   const [wantSort, setWantSort] = useState<WantToTrySort>("newest");
-  const [favoritesSort, setFavoritesSort] = useState<FavoritesSort>("newest");
   const [listsSort, setListsSort] = useState<ListsSort>("newest");
 
   useEffect(() => {
@@ -51,16 +49,14 @@ export function useBitesFilters() {
     (segment: BitesSegment) => {
       if (segment === "journal") return journalSort;
       if (segment === "want_to_try") return wantSort;
-      if (segment === "favorites") return favoritesSort;
       return listsSort;
     },
-    [journalSort, wantSort, favoritesSort, listsSort],
+    [journalSort, wantSort, listsSort],
   );
 
   const setSortForSegment = useCallback((segment: BitesSegment, value: string) => {
     if (segment === "journal") setJournalSort(value as JournalSort);
     else if (segment === "want_to_try") setWantSort(value as WantToTrySort);
-    else if (segment === "favorites") setFavoritesSort(value as FavoritesSort);
     else setListsSort(value as ListsSort);
     setSortOpen(false);
   }, []);
@@ -82,7 +78,6 @@ export function useBitesFilters() {
     setSortOpen,
     journalSort,
     wantSort,
-    favoritesSort,
     listsSort,
     getSortForSegment,
     setSortForSegment,

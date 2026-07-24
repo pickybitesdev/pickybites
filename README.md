@@ -230,8 +230,17 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ### Database setup
 
 1. Run `supabase/schema.sql` in the SQL Editor (base tables + RLS + storage buckets).
-2. Run migrations in order: `001_google_places.sql` → `002_tier1.sql` → `003_tier2.sql` → `004_tier_b.sql` → **`005_core_systems.sql`**.
+2. Run migrations in order: `001_google_places.sql` → `002_tier1.sql` → `003_tier2.sql` → `004_tier_b.sql` → **`005_core_systems.sql`** → … → **`010_share_sources.sql`** (share → Try Next sources).
 3. Create storage buckets `avatars` and `review-photos` (public read) if not already present.
+4. Deploy Edge Functions: `places`, `yelp`, and **`share-resolve`** (URL metadata with SSRF guards).
+
+### Share to PickyBites → Try Next
+
+Native **iOS Share Extension** + **Android ACTION_SEND** (via `expo-share-intent@5.1.1`, Expo SDK 54).
+
+- **Not available in Expo Go** — requires an EAS development/production build.
+- Flow: share sheet → `/share-import` confirmation → Save to Try Next (existing `bookmarks`) + `saved_item_sources`.
+- Docs: [`docs/share-intake-native.md`](docs/share-intake-native.md), QA checklist [`docs/share-intake-qa.md`](docs/share-intake-qa.md).
 
 **Naming map (spec → app):**
 

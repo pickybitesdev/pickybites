@@ -16,12 +16,10 @@ import {
 } from "@/components/bites/BitesWantToTrySection";
 import { PlanVisitSheet } from "@/components/bites/PlanVisitSheet";
 import { VisitedFollowUpSheet } from "@/components/bites/VisitedFollowUpSheet";
-import { BitesFavoritesSection } from "@/components/bites/BitesFavoritesSection";
 import { BitesListsSection } from "@/components/bites/BitesListsSection";
 import { useBitesFilters } from "@/hooks/useBitesFilters";
 import { useBitesJournal } from "@/hooks/useBitesJournal";
 import { useBitesWantToTry } from "@/hooks/useBitesWantToTry";
-import { useBitesFavorites, type FavoritesSubSegment } from "@/hooks/useBitesFavorites";
 import { BITES_SEGMENTS, type BitesSegment } from "@/lib/bites";
 import { matchesList } from "@/lib/bites-search";
 import { sortLists } from "@/lib/bites-sort";
@@ -29,7 +27,7 @@ import { getCurrentCoordinates } from "@/lib/location";
 import { TAB_SCROLL_BOTTOM_PADDING } from "@/lib/tab-bar";
 import { addBiteHref } from "@/lib/add-actions";
 import { addPlanToCalendar } from "@/lib/calendar-event";
-import { plannedAtFromIsoDate } from "@/lib/plan-visit";
+import { plannedAtFromLocalDateTime } from "@/lib/plan-visit";
 import type { Coordinates } from "@/lib/places/types";
 import type { Bookmark } from "@/lib/types";
 import { useThemedColors } from "@/lib/useThemedColors";
@@ -38,7 +36,8 @@ import { hapticSuccess } from "@/lib/haptics";
 
 function parseSegment(raw: string | string[] | undefined): BitesSegment {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value === "want_to_try" || value === "favorites" || value === "lists" || value === "journal") {
+  if (value === "favorites") return "journal";
+  if (value === "want_to_try" || value === "lists" || value === "journal") {
     return value;
   }
   return "journal";
@@ -52,7 +51,6 @@ export default function BitesScreen() {
   const params = useLocalSearchParams<{ segment?: string }>();
   const [segment, setSegment] = useState<BitesSegment>(() => parseSegment(params.segment));
   const [mapMode, setMapMode] = useState(false);
-  const [favoritesSub, setFavoritesSub] = useState<FavoritesSubSegment>("restaurants");
   const [planTarget, setPlanTarget] = useState<Bookmark | null>(null);
   const [visitedFollowUp, setVisitedFollowUp] = useState<{
     placeName: string;
@@ -78,7 +76,6 @@ export default function BitesScreen() {
     setSortOpen,
     journalSort,
     wantSort,
-    favoritesSort,
     listsSort,
     getSortForSegment,
     setSortForSegment,
@@ -93,7 +90,6 @@ export default function BitesScreen() {
 
   const journal = useBitesJournal(debouncedSearch, filters, journalSort);
   const wantToTry = useBitesWantToTry(debouncedSearch, filters, wantSort);
-  const favoritesData = useBitesFavorites(debouncedSearch, filters, favoritesSort, favoritesSub);
 
   const userLists = getMyLists();
   const filteredLists = useMemo(() => {
@@ -125,13 +121,8 @@ export default function BitesScreen() {
         ...new Set(wantToTry.items.map((b) => b.placeCuisine).filter(Boolean) as string[]),
       ].sort();
     }
-    return [
-      ...new Set([
-        ...favoritesData.restaurantItems.map((i) => i.restaurant.cuisine),
-        ...favoritesData.dishItems.map((i) => i.restaurant?.cuisine).filter(Boolean) as string[],
-      ]),
-    ].sort();
-  }, [segment, journal.allEntries, wantToTry.items, favoritesData.restaurantItems, favoritesData.dishItems]);
+    return [];
+  }, [segment, journal.allEntries, wantToTry.items]);
 
   const cityOptions = useMemo(() => {
     if (segment === "journal") {
@@ -140,13 +131,8 @@ export default function BitesScreen() {
     if (segment === "want_to_try") {
       return [...new Set(wantToTry.items.map((b) => b.placeCity).filter(Boolean))].sort();
     }
-    return [
-      ...new Set([
-        ...favoritesData.restaurantItems.map((i) => i.restaurant.city),
-        ...favoritesData.dishItems.map((i) => i.restaurant?.city).filter(Boolean) as string[],
-      ]),
-    ].sort();
-  }, [segment, journal.allEntries, wantToTry.items, favoritesData.restaurantItems, favoritesData.dishItems]);
+    return [];
+  }, [segment, journal.allEntries, wantToTry.items]);
 
   const resolveRestaurantId = useCallback(
     async (bookmark: Bookmark): Promise<string | null> => {
@@ -173,8 +159,13 @@ export default function BitesScreen() {
 
   const openBookmark = useCallback(
     async (bookmark: Bookmark) => {
+      if (bookmark.resolutionStatus === "link_only" || !bookmark.googlePlaceId) {
+        router.push(`/try-next/${bookmark.id}`);
+        return;
+      }
       const restaurantId = await resolveRestaurantId(bookmark);
       if (restaurantId) router.push(`/restaurant/${restaurantId}`);
+      else router.push(`/try-next/${bookmark.id}`);
     },
     [resolveRestaurantId],
   );
@@ -184,12 +175,12 @@ export default function BitesScreen() {
   }, []);
 
   const confirmPlanVisit = useCallback(
-    async (opts: { dateIso: string; addToCalendar: boolean }) => {
+    async (opts: { dateIso: string; timeHhmm: string; addToCalendar: boolean }) => {
       const bookmark = planTarget;
       if (!bookmark) return;
       setPlanTarget(null);
 
-      const plannedAt = plannedAtFromIsoDate(opts.dateIso);
+      const plannedAt = plannedAtFromLocalDateTime(opts.dateIso, opts.timeHhmm);
       const result = await wantToTry.updateStatus(bookmark.id, "planned", { plannedAt });
       if (!result.ok) {
         Alert.alert("Error", result.error);
@@ -201,6 +192,7 @@ export default function BitesScreen() {
         await addPlanToCalendar({
           placeName: bookmark.placeName,
           dateIso: opts.dateIso,
+          timeHhmm: opts.timeHhmm,
           address: bookmark.placeAddress,
           city: bookmark.placeCity,
         });
@@ -236,8 +228,6 @@ export default function BitesScreen() {
       if (restaurantId && !bookmark.restaurantId) {
         await wantToTry.updateStatus(bookmark.id, "visited", { restaurantId });
       }
-      // Always pass bookmarkId so Add a Bite can prefill from place fields
-      // even when the restaurant row isn't in the store yet.
       router.push(
         addBiteHref({
           restaurantId: restaurantId ?? bookmark.restaurantId,
@@ -309,9 +299,7 @@ export default function BitesScreen() {
 
         {segment === "journal" && !mapMode ? (
           <BitesJournalSection
-            months={journal.months}
-            stats={journal.stats}
-            reviewCount={journal.allEntries.length}
+            entries={journal.entries}
             isEmpty={journal.isEmpty}
             isFilterEmpty={journal.isFilterEmpty}
             hasSearch={Boolean(debouncedSearch.trim())}
@@ -333,21 +321,6 @@ export default function BitesScreen() {
             onLeaveReview={(b) => void handleLeaveReview(b)}
             onMoveToWantToTry={(b) => void handleMoveToWantToTry(b)}
             onRemove={(id) => wantToTry.remove(id)}
-          />
-        ) : null}
-
-        {segment === "favorites" ? (
-          <BitesFavoritesSection
-            subSegment={favoritesSub}
-            onSubSegmentChange={setFavoritesSub}
-            restaurantItems={favoritesData.restaurantItems}
-            dishItems={favoritesData.dishItems}
-            isEmpty={favoritesData.isEmpty}
-            isFilterEmpty={favoritesData.isFilterEmpty}
-            hasSearch={Boolean(debouncedSearch.trim())}
-            onUnfavoriteRestaurant={(id) => void favoritesData.toggleRestaurantFavorite(id)}
-            onUnfavoriteDish={(id) => void favoritesData.toggleDishFavorite(id)}
-            onOpenJournal={() => setSegment("journal")}
           />
         ) : null}
 
@@ -388,6 +361,12 @@ export default function BitesScreen() {
         initialDate={
           planTarget?.plannedAt ? planTarget.plannedAt.slice(0, 10) : null
         }
+        initialPlannedAt={planTarget?.plannedAt}
+        cuisine={planTarget?.placeCuisine}
+        city={planTarget?.placeCity}
+        address={planTarget?.placeAddress}
+        restaurantId={planTarget?.restaurantId}
+        googlePlaceId={planTarget?.googlePlaceId}
         onClose={() => setPlanTarget(null)}
         onConfirm={(opts) => void confirmPlanVisit(opts)}
       />

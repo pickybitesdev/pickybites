@@ -16,6 +16,26 @@ export function routeAfterAuth(user: User | null | undefined): AuthRoute {
   return AUTHENTICATED_HOME;
 }
 
+/** Safe post-login resume (share import, deep links). Rejects open redirects. */
+export function resolveAuthReturnTo(
+  returnTo: string | string[] | undefined,
+  pendingId?: string | string[] | undefined,
+): Href | null {
+  const path = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  if (!path || !path.startsWith("/") || path.startsWith("//")) return null;
+  const allowed = ["/share-import", "/(tabs)/discover", "/(tabs)/bites", "/(tabs)/profile", "/friends"];
+  if (!allowed.some((a) => path === a || path.startsWith(`${a}?`))) {
+    if (path !== "/share-import") return null;
+  }
+  if (path.startsWith("/share-import")) {
+    const id = Array.isArray(pendingId) ? pendingId[0] : pendingId;
+    if (id) {
+      return { pathname: "/share-import", params: { pendingId: id } } as const;
+    }
+  }
+  return path as Href;
+}
+
 /** Cold-start / index redirect after onboarding + auth state is known. */
 export function resolveEntryRoute(
   hasSeenOnboarding: boolean,

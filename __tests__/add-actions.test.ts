@@ -60,6 +60,12 @@ describe("visited bookmark → Add a Bite prefill", () => {
     visitedAt: "2026-07-23T12:00:00Z",
     createdAt: "2026-07-20T12:00:00Z",
     updatedAt: "2026-07-23T12:00:00Z",
+  createdVia: "in_app",
+  resolutionStatus: "linked",
+  sourcePlatform: null,
+  primarySourceTitle: null,
+  primarySourceThumbnailUrl: null,
+  sources: [],
   };
 
   it("maps bookmark place fields into a PlaceResult", () => {

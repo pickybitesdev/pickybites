@@ -235,20 +235,22 @@ serve(async (req) => {
       const res = await fetch(`${BASE}/places/${body.googlePlaceId}`, {
         headers: {
           "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": "photos,currentOpeningHours",
+          "X-Goog-FieldMask": "photos,currentOpeningHours,regularOpeningHours",
         },
       });
       if (!res.ok) {
-        return json({ photos: [], openNow: null });
+        return json({ photos: [], openNow: null, openingPeriods: null });
       }
       const data = await res.json();
       const photos = (data.photos ?? [])
         .slice(0, 8)
         .map((p: { name: string }) => photoUrl(p.name, apiKey))
         .filter(Boolean);
+      const periods = data.regularOpeningHours?.periods ?? null;
       return json({
         photos,
-        openNow: data.currentOpeningHours?.openNow ?? null,
+        openNow: data.currentOpeningHours?.openNow ?? data.regularOpeningHours?.openNow ?? null,
+        openingPeriods: periods,
       });
     }
 
@@ -578,8 +580,8 @@ const ADDRESS_TYPES = new Set([
 
 function classifyPlaceTypes(types: string[] = []): "restaurant" | "area" | "address" | "other" {
   if (types.some((t) => RESTAURANT_TYPES.has(t) || t.endsWith("_restaurant"))) return "restaurant";
-  if (types.some((t) => ADDRESS_TYPES.has(t))) return "address";
   if (types.some((t) => AREA_TYPES.has(t))) return "area";
+  if (types.some((t) => ADDRESS_TYPES.has(t))) return "address";
   return "other";
 }
 

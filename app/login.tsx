@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { useAppStore } from "@/store/useAppStore";
 import { hapticSuccess } from "@/lib/haptics";
+import { resolveAuthReturnTo } from "@/lib/navigation";
 
 export default function Login() {
+  const params = useLocalSearchParams<{ returnTo?: string; pendingId?: string }>();
   const login = useAppStore((s) => s.login);
   const demoLogin = useAppStore((s) => s.demoLogin);
   const [email, setEmail] = useState("");
@@ -17,6 +19,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   const goHome = (userId: string) => {
+    const resume = resolveAuthReturnTo(params.returnTo, params.pendingId);
+    if (resume) {
+      router.replace(resume);
+      return;
+    }
     const user = useAppStore.getState().users.find((u) => u.id === userId);
     if (user && !user.hasCompletedTasteQuiz) router.replace("/taste-quiz");
     else router.replace("/(tabs)/discover");

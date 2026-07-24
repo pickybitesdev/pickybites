@@ -19,9 +19,20 @@ import { useThemedColors } from "@/lib/useThemedColors";
 import { ui } from "@/constants/ui";
 import { cn } from "@/lib/utils";
 
-type ReviewCardProps = { review: Review; showRestaurant?: boolean; showAuthorLink?: boolean };
+type ReviewCardProps = {
+  review: Review;
+  showRestaurant?: boolean;
+  showAuthorLink?: boolean;
+  /** Likes & comments — off on restaurant detail. */
+  showEngagement?: boolean;
+};
 
-function ReviewCardInner({ review, showRestaurant = true, showAuthorLink = true }: ReviewCardProps) {
+function ReviewCardInner({
+  review,
+  showRestaurant = true,
+  showAuthorLink = true,
+  showEngagement = true,
+}: ReviewCardProps) {
   const currentUserId = useAppStore((s) => s.currentUserId);
   const user = useAppStore((s) => s.users.find((u) => u.id === review.userId));
   const restaurant = useAppStore((s) =>
@@ -120,7 +131,7 @@ function ReviewCardInner({ review, showRestaurant = true, showAuthorLink = true 
         )}
         <Text className="text-xs text-savr-400 dark:text-savr-500 mt-1">Visited {formatDate(review.visitDate)}</Text>
 
-        {previewComment && !showComments && (
+        {showEngagement && previewComment && !showComments && (
           <Pressable onPress={() => setShowComments(true)} className="flex-row gap-2 items-start">
             <Avatar name={getUser(previewComment.userId)?.displayName ?? "?"} src={getUser(previewComment.userId)?.avatarUrl} size="sm" />
             <View className="flex-1">
@@ -136,14 +147,18 @@ function ReviewCardInner({ review, showRestaurant = true, showAuthorLink = true 
         )}
 
         <View className={cn("flex-row gap-6 pt-3 mt-1 border-t", ui.border.divider)}>
-          <Pressable onPress={handleLike} className="flex-row items-center gap-1.5 min-h-[44px]">
-            <Ionicons name={liked ? "heart" : "heart-outline"} size={20} color={liked ? colors.heart : colors.icon} />
-            <Text className={`text-sm ${ui.text.muted}`}>{likeCount}</Text>
-          </Pressable>
-          <Pressable onPress={() => { hapticLight(); setShowComments(!showComments); }} className="flex-row items-center gap-1.5 min-h-[44px]">
-            <Ionicons name="chatbubble-outline" size={20} color={colors.icon} />
-            <Text className={`text-sm ${ui.text.muted}`}>{commentCount}</Text>
-          </Pressable>
+          {showEngagement ? (
+            <>
+              <Pressable onPress={handleLike} className="flex-row items-center gap-1.5 min-h-[44px]">
+                <Ionicons name={liked ? "heart" : "heart-outline"} size={20} color={liked ? colors.heart : colors.icon} />
+                <Text className={`text-sm ${ui.text.muted}`}>{likeCount}</Text>
+              </Pressable>
+              <Pressable onPress={() => { hapticLight(); setShowComments(!showComments); }} className="flex-row items-center gap-1.5 min-h-[44px]">
+                <Ionicons name="chatbubble-outline" size={20} color={colors.icon} />
+                <Text className={`text-sm ${ui.text.muted}`}>{commentCount}</Text>
+              </Pressable>
+            </>
+          ) : null}
           {restaurant && (
             <Pressable
               onPress={() => shareReview(user.displayName, restaurant.id, restaurant.name, getReviewOverallRating(review), review.text)}
@@ -166,7 +181,7 @@ function ReviewCardInner({ review, showRestaurant = true, showAuthorLink = true 
             </>
           )}
         </View>
-        {showComments && (
+        {showEngagement && showComments && (
           <View className="gap-2">
             {reviewComments.map((c) => {
               const cu = getUser(c.userId);

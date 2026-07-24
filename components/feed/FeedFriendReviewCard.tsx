@@ -143,7 +143,7 @@ export function FeedFriendReviewCard({
             onPress={handleSave}
             hitSlop={8}
             accessibilityLabel={wantToTryBookmarkLabel(!!isBookmarked)}
-            accessibilityHint={bitesSegmentHint("want_to_try")}
+            accessibilityHint={bitesSegmentHint()}
             className="w-9 h-9 items-center justify-center -mt-0.5"
             testID="feed-friend-bookmark"
           >

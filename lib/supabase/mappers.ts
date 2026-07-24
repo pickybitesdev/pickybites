@@ -335,11 +335,61 @@ type DbBookmark = {
   visited_at: string | null;
   created_at: string;
   updated_at: string | null;
+  created_via?: string | null;
+  resolution_status?: string | null;
+  source_platform?: string | null;
+  primary_source_title?: string | null;
+  primary_source_thumbnail_url?: string | null;
+  saved_item_sources?: DbSavedItemSource[] | null;
+};
+
+type DbSavedItemSource = {
+  id: string;
+  saved_restaurant_id: string;
+  user_id: string;
+  source_url: string;
+  canonical_url: string;
+  source_platform: string;
+  title: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
 };
 
 function mapBucketStatus(raw: string | null | undefined): Bookmark["status"] {
   if (raw === "planned" || raw === "visited") return raw;
   return "want_to_try";
+}
+
+function mapCreatedVia(raw: string | null | undefined): Bookmark["createdVia"] {
+  if (
+    raw === "discover" ||
+    raw === "share_extension" ||
+    raw === "manual" ||
+    raw === "restaurant" ||
+    raw === "feed"
+  ) {
+    return raw;
+  }
+  return "in_app";
+}
+
+function mapResolutionStatus(raw: string | null | undefined): Bookmark["resolutionStatus"] {
+  if (raw === "link_only" || raw === "pending_link") return raw;
+  return "linked";
+}
+
+export function mapSavedItemSource(row: DbSavedItemSource): import("@/lib/types").SavedItemSource {
+  return {
+    id: row.id,
+    savedRestaurantId: row.saved_restaurant_id,
+    userId: row.user_id,
+    sourceUrl: row.source_url,
+    canonicalUrl: row.canonical_url,
+    sourcePlatform: (row.source_platform as import("@/lib/types").ShareSourcePlatform) || "unknown",
+    title: row.title,
+    thumbnailUrl: row.thumbnail_url,
+    createdAt: row.created_at,
+  };
 }
 
 export function mapBookmark(row: DbBookmark): Bookmark {
@@ -362,6 +412,12 @@ export function mapBookmark(row: DbBookmark): Bookmark {
     visitedAt: row.visited_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
+    createdVia: mapCreatedVia(row.created_via),
+    resolutionStatus: mapResolutionStatus(row.resolution_status),
+    sourcePlatform: (row.source_platform as Bookmark["sourcePlatform"]) ?? null,
+    primarySourceTitle: row.primary_source_title ?? null,
+    primarySourceThumbnailUrl: row.primary_source_thumbnail_url ?? null,
+    sources: (row.saved_item_sources ?? []).map(mapSavedItemSource),
   };
 }
 

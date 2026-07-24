@@ -8,6 +8,8 @@ import { getRestaurantRatingsBreakdown } from "@/lib/restaurant-stats";
 import { fetchPlaceDetails, isGooglePlacesConfigured } from "@/lib/places/google";
 import { enrichPlaceWithYelp, isYelpConfigured, type YelpEnrichment } from "@/lib/places/yelp";
 import { shareRestaurant, openInMaps } from "@/lib/share";
+import { openOriginalSource } from "@/lib/share-intake/open-source";
+import { track } from "@/lib/analytics";
 import { ReviewCard } from "@/components/reviews/ReviewCard";
 import { DishCard } from "@/components/dishes/DishCard";
 import { Rating } from "@/components/ui/Rating";
@@ -15,16 +17,15 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SavedSourcesSheet } from "@/components/share/SavedSourcesSheet";
 import { APP_NAME } from "@/constants/branding";
 import { formatPrice } from "@/lib/utils";
 import { ui } from "@/constants/ui";
 import { hapticLight } from "@/lib/haptics";
 import {
   wantToTryBookmarkLabel,
-  lovesHeartLabel,
   bitesSegmentHint,
   TRY_NEXT_LABEL,
-  LOVES_LABEL,
 } from "@/lib/bites";
 
 function StatBox({ label, value }: { label: string; value: string }) {
@@ -40,20 +41,30 @@ export default function RestaurantScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     getRestaurant, reviews, dishes, reviewPhotos, currentUserId, follows, getUser,
-    isRestaurantBookmarked, toggleRestaurantBookmark,
-    isRestaurantFavorite, toggleRestaurantFavorite,
+    isRestaurantBookmarked, toggleRestaurantBookmark, bookmarks,
   } = useAppStore();
   const restaurant = getRestaurant(id!);
   const [googlePhotos, setGooglePhotos] = useState<string[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [yelp, setYelp] = useState<YelpEnrichment | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+
+  const myBookmark = useMemo(
+    () =>
+      bookmarks.find(
+        (b) =>
+          b.restaurantId === id ||
+          (restaurant?.googlePlaceId && b.googlePlaceId === restaurant.googlePlaceId),
+      ) ?? null,
+    [bookmarks, id, restaurant?.googlePlaceId],
+  );
+  const savedSources = myBookmark?.sources ?? [];
 
   const restReviews = reviews.filter((r) => r.restaurantId === id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const restDishes = dishes.filter((d) => d.restaurantId === id);
   const myReview = restReviews.find((r) => r.userId === currentUserId);
   const stats = getRestaurantRatingsBreakdown(id!, currentUserId, reviews, follows, getUser);
   const bookmarked = restaurant ? isRestaurantBookmarked(restaurant) : false;
-  const favorited = restaurant ? isRestaurantFavorite(restaurant.id) : false;
 
   const reviewPhotoUrls = useMemo(() => {
     const ids = new Set(restReviews.map((r) => r.id));
@@ -112,13 +123,8 @@ export default function RestaurantScreen() {
     if (!result.ok && result.error) Alert.alert(TRY_NEXT_LABEL, result.error);
   };
 
-  const handleFavorite = async () => {
-    hapticLight();
-    const result = await toggleRestaurantFavorite(restaurant.id);
-    if (!result.ok && result.error) Alert.alert(LOVES_LABEL, result.error);
-  };
-
   return (
+    <>
     <ScrollView className="flex-1 bg-savr-50 dark:bg-savr-950" contentContainerClassName="pb-6 gap-4">
       {heroImage ? (
         <Pressable
@@ -145,18 +151,10 @@ export default function RestaurantScreen() {
             </View>
             <View className="flex-row items-center">
               <Pressable
-                onPress={handleFavorite}
-                className="p-2"
-                accessibilityLabel={lovesHeartLabel(favorited)}
-                accessibilityHint={bitesSegmentHint("favorites")}
-              >
-                <Ionicons name={favorited ? "heart" : "heart-outline"} size={24} color="#FF8559" />
-              </Pressable>
-              <Pressable
                 onPress={handleBookmark}
                 className="p-2"
                 accessibilityLabel={wantToTryBookmarkLabel(bookmarked)}
-                accessibilityHint={bitesSegmentHint("want_to_try")}
+                accessibilityHint={bitesSegmentHint()}
               >
                 <Ionicons name={bookmarked ? "bookmark" : "bookmark-outline"} size={24} color="#FF8559" />
               </Pressable>
@@ -197,6 +195,42 @@ export default function RestaurantScreen() {
             <StatBox label={`${APP_NAME} avg`} value={stats.overallAvg != null ? stats.overallAvg.toFixed(1) : "—"} />
           </View>
         )}
+
+        {savedSources.length > 0 && myBookmark ? (
+          <Card className="gap-2 py-4">
+            <Text className={`text-base font-bold ${ui.text.primary}`}>Why you saved this</Text>
+            {savedSources.length === 1 ? (
+              <View className="gap-1">
+                <Text className={`text-xs font-semibold ${ui.text.muted}`}>
+                  Saved from {savedSources[0].sourcePlatform}
+                </Text>
+                {savedSources[0].title ? (
+                  <Text className={`text-sm ${ui.text.secondary}`} numberOfLines={2}>
+                    {savedSources[0].title}
+                  </Text>
+                ) : null}
+                <Pressable
+                  onPress={() => {
+                    track("original_source_opened", {
+                      platform: savedSources[0].sourcePlatform,
+                    });
+                    void openOriginalSource(savedSources[0].sourceUrl);
+                  }}
+                  className="flex-row items-center gap-1.5 mt-1"
+                >
+                  <Ionicons name="open-outline" size={16} color="#FF8559" />
+                  <Text className="text-sm font-semibold text-savr-500">View Original</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable onPress={() => setSourcesOpen(true)}>
+                <Text className="text-sm font-semibold text-savr-500">
+                  {savedSources.length} inspiration links
+                </Text>
+              </Pressable>
+            )}
+          </Card>
+        ) : null}
 
         {myReview ? (
           <Button
@@ -257,11 +291,22 @@ export default function RestaurantScreen() {
               onAction={() => router.push(`/add-bite?restaurantId=${id}`)}
             />
           ) : (
-            restReviews.map((r) => <ReviewCard key={r.id} review={r} showRestaurant={false} />)
+            restReviews.map((r) => (
+              <ReviewCard key={r.id} review={r} showRestaurant={false} showEngagement={false} />
+            ))
           )}
         </View>
       </View>
     </ScrollView>
+    {myBookmark ? (
+      <SavedSourcesSheet
+        visible={sourcesOpen}
+        bookmarkId={myBookmark.id}
+        sources={savedSources}
+        onClose={() => setSourcesOpen(false)}
+      />
+    ) : null}
+    </>
   );
 }
 

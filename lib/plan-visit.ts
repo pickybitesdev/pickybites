@@ -1,6 +1,6 @@
 /** Plan-a-visit date helpers for Try Next → Planned. */
 
-export type PlanVisitPresetId = "tonight" | "tomorrow" | "weekend" | "next_week";
+export type PlanVisitPresetId = "tonight" | "tomorrow";
 
 export type PlanVisitPreset = {
   id: PlanVisitPresetId;
@@ -22,22 +22,68 @@ function addDays(base: Date, n: number): Date {
   return d;
 }
 
-/** Next Saturday (or today if Saturday). */
-function nextWeekend(from = new Date()): Date {
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const day = d.getDay(); // 0 Sun … 6 Sat
-  if (day === 6) return d;
-  const delta = (6 - day + 7) % 7 || 7;
-  return addDays(d, delta);
-}
-
 export function planVisitPresets(now = new Date()): PlanVisitPreset[] {
   return [
     { id: "tonight", label: "Tonight", date: toIsoDate(now) },
     { id: "tomorrow", label: "Tomorrow", date: toIsoDate(addDays(now, 1)) },
-    { id: "weekend", label: "This weekend", date: toIsoDate(nextWeekend(now)) },
-    { id: "next_week", label: "Next week", date: toIsoDate(addDays(now, 7)) },
   ];
+}
+
+/** Local time HH:mm (24h). */
+export type VisitTimeHhmm = string;
+
+export const DEFAULT_VISIT_TIME = "12:00";
+
+export function isValidVisitTime(value: string): boolean {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!m) return false;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return h >= 0 && h <= 23 && min >= 0 && min <= 59;
+}
+
+export function visitTimeFromPlannedAt(iso: string | null | undefined): VisitTimeHhmm {
+  if (!iso) return DEFAULT_VISIT_TIME;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return DEFAULT_VISIT_TIME;
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${min}`;
+}
+
+export function formatVisitTimeLabel(timeHhmm: string): string {
+  if (!isValidVisitTime(timeHhmm)) return timeHhmm;
+  const [h, min] = timeHhmm.split(":").map(Number);
+  const d = new Date(2000, 0, 1, h, min);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/** Local date + local time → ISO timestamp for plannedAt. */
+export function plannedAtFromLocalDateTime(isoDate: string, timeHhmm: string): string {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(timeHhmm.trim());
+  if (!dm || !tm || !isValidIsoDate(isoDate) || !isValidVisitTime(timeHhmm)) {
+    return new Date().toISOString();
+  }
+  const y = Number(dm[1]);
+  const mo = Number(dm[2]);
+  const d = Number(dm[3]);
+  const h = Number(tm[1]);
+  const min = Number(tm[2]);
+  return new Date(y, mo - 1, d, h, min, 0, 0).toISOString();
+}
+
+export function formatPlanWhen(dateIso: string, timeHhmm: string): string {
+  const iso = plannedAtFromLocalDateTime(dateIso, timeHhmm);
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return dateIso;
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /** Store plannedAt as noon UTC on that local date so the calendar day stays stable. */
@@ -90,14 +136,32 @@ export function nextCalendarDayStamp(dayStamp: string): string {
   return `${yy}${mm}${dd}`;
 }
 
+function toCalendarDateTimeStamp(dateIso: string, timeHhmm: string): string {
+  const [h, min] = timeHhmm.split(":");
+  const day = dateIso.replace(/-/g, "");
+  return `${day}T${h.padStart(2, "0")}${min.padStart(2, "0")}00`;
+}
+
+function addHoursToCalendarStamp(stamp: string, hours: number): string {
+  const day = stamp.slice(0, 8);
+  const h = Number(stamp.slice(9, 11));
+  const m = Number(stamp.slice(11, 13));
+  const endH = h + hours;
+  return `${day}T${String(endH).padStart(2, "0")}${String(m).padStart(2, "0")}00`;
+}
+
 export function buildGoogleCalendarUrl(opts: {
   title: string;
   dateIso: string;
+  timeHhmm?: string;
   details?: string;
   location?: string;
 }): string {
-  const start = toCalendarDayStamp(opts.dateIso);
-  const end = nextCalendarDayStamp(start);
+  const useTimed = opts.timeHhmm && isValidVisitTime(opts.timeHhmm);
+  const start = useTimed
+    ? toCalendarDateTimeStamp(opts.dateIso, opts.timeHhmm!)
+    : toCalendarDayStamp(opts.dateIso);
+  const end = useTimed ? addHoursToCalendarStamp(start, 2) : nextCalendarDayStamp(start);
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: opts.title,

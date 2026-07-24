@@ -9,6 +9,7 @@ type PlacesResponse = {
   resolvedPlaces?: ResolvedSearchPlace[];
   photos?: string[];
   openNow?: boolean | null;
+  openingPeriods?: { open?: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } }[] | null;
   error?: string;
 };
 
@@ -83,9 +84,17 @@ export async function searchTextRemote(
   return data.places ?? [];
 }
 
-export async function fetchDetailsRemote(googlePlaceId: string): Promise<{ photos: string[]; openNow: boolean | null }> {
+export async function fetchDetailsRemote(googlePlaceId: string): Promise<{
+  photos: string[];
+  openNow: boolean | null;
+  openingPeriods: PlacesResponse["openingPeriods"];
+}> {
   const data = await invokePlaces({ action: "details", googlePlaceId });
-  return { photos: data.photos ?? [], openNow: data.openNow ?? null };
+  return {
+    photos: data.photos ?? [],
+    openNow: data.openNow ?? null,
+    openingPeriods: data.openingPeriods ?? null,
+  };
 }
 
 export async function autocompleteRemote(

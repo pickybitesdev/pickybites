@@ -81,7 +81,7 @@ export default function ListsScreen() {
           </View>
           <View className="flex-1">
             <Text className={`font-semibold ${ui.text.primary}`}>Bites</Text>
-            <Text className={`text-sm ${ui.text.muted}`}>Try Next, Loves, and Lists</Text>
+            <Text className={`text-sm ${ui.text.muted}`}>Try Next and Lists in Bites</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={isDark ? iconColors.mutedDark : iconColors.muted} />
         </Pressable>

@@ -5,16 +5,16 @@ import * as remote from "./remote";
 import {
   mockNearbyPlaces,
   resolveYelpPlace,
-  searchNearbyYelp,
-  searchYelpSuggestions,
   isYelpPlaceId,
 } from "./yelp";
 import {
   classifyPlaceTypes,
+  mapAutocompleteSuggestion,
   normalizePlaceResourceId,
   type PlaceSuggestion,
   type ResolvedSearchPlace,
 } from "./autocomplete";
+import { normalizeOpeningPeriods, type OpeningPeriod } from "@/lib/restaurant-hours";
 
 /** @deprecated Local dev only — production uses Supabase Edge Function `places`. */
 function readLocalPlacesApiKey(): string {
@@ -56,7 +56,7 @@ export function hasLocalPlacesApiKey(): boolean {
 }
 
 /**
- * Infrastructure is present (Supabase/Yelp edge function or local Google key).
+ * Infrastructure is present (Supabase places edge function or local Google key).
  * Does not guarantee the user can search — remote path still needs a real session.
  */
 export function isGooglePlacesConfigured(): boolean {
@@ -69,22 +69,25 @@ export type PlacesSearchStatus = "ready" | "sign_in" | "unavailable";
 export type PlacesSearchStatusOpts = {
   isAuthenticated: boolean;
   /**
-   * When false (Try Demo / local mock), use demo pins — no Yelp session required.
-   * When true, Discover uses Yelp via Supabase (requires real sign-in).
+   * When false (Try Demo / local mock), use demo pins — no Places session required.
+   * When true, Discover uses Google Places via Supabase (requires real sign-in).
    */
   useRemotePlaces?: boolean;
 };
 
 /**
  * Whether restaurant search can run right now.
- * Remote = Yelp Edge Function (signed-in). Demo = mock pins.
+ * Remote = Google Places Edge Function (signed-in). Demo = mock pins.
  */
 export function getPlacesSearchStatus(opts: PlacesSearchStatusOpts): PlacesSearchStatus {
   const useRemote = opts.useRemotePlaces ?? isSupabaseConfigured();
   if (useRemote && isSupabaseConfigured()) {
-    return opts.isAuthenticated ? "ready" : "sign_in";
+    if (opts.isAuthenticated) return "ready";
+    // Dev / Try Demo: still allow city & restaurant search via local Google key.
+    if (hasLocalPlacesApiKey()) return "ready";
+    return "sign_in";
   }
-  // Try Demo: mock nearby pins (no live Places/Yelp).
+  // Try Demo: mock nearby pins (no live Places).
   return "ready";
 }
 
@@ -92,7 +95,7 @@ export function isPlacesSearchReady(opts: PlacesSearchStatusOpts): boolean {
   return getPlacesSearchStatus(opts) === "ready";
 }
 
-/** Prefer Yelp Edge Function when a Supabase JWT exists. */
+/** Use Supabase Edge Function `places` when a Supabase JWT exists. */
 async function shouldUseRemotePlaces(): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
   return remote.hasPlacesAuthSession();
@@ -146,10 +149,137 @@ async function localPlacesRequest(endpoint: string, body: object): Promise<Place
   return (data.places ?? []).map(mapPlace).filter(Boolean) as PlaceResult[];
 }
 
+async function localAutocompleteRequest(
+  query: string,
+  opts?: {
+    coords?: Coordinates | null;
+    sessionToken?: string;
+    radiusMeters?: number;
+  },
+): Promise<PlaceSuggestion[]> {
+  const key = readLocalPlacesApiKey();
+  if (!key) return [];
+
+  const payload: Record<string, unknown> = { input: query.trim() };
+  if (opts?.sessionToken) payload.sessionToken = opts.sessionToken;
+  if (opts?.coords?.latitude != null && opts?.coords?.longitude != null) {
+    payload.locationBias = {
+      circle: {
+        center: { latitude: opts.coords.latitude, longitude: opts.coords.longitude },
+        radius: Math.min(Math.max(opts.radiusMeters ?? 25000, 500), 50000),
+      },
+    };
+  }
+
+  const res = await fetch(`${BASE}/places:autocomplete`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Google Places autocomplete error:", res.status, err);
+    throw new Error("Could not load search suggestions.");
+  }
+  const data = await res.json();
+  return (data.suggestions ?? [])
+    .map(mapAutocompleteSuggestion)
+    .filter(Boolean) as PlaceSuggestion[];
+}
+
+async function localResolvePlaceRequest(
+  googlePlaceId: string,
+  sessionToken?: string,
+): Promise<ResolvedSearchPlace | null> {
+  const key = readLocalPlacesApiKey();
+  if (!key) return null;
+
+  const id = normalizePlaceResourceId(googlePlaceId);
+  const url = new URL(`${BASE}/places/${id}`);
+  if (sessionToken) url.searchParams.set("sessionToken", sessionToken);
+  const res = await fetch(url.toString(), {
+    headers: {
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask":
+        "id,displayName,formattedAddress,shortFormattedAddress,location,viewport,types,primaryType,photos,priceLevel,currentOpeningHours",
+    },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return mapResolvedPlace(data);
+}
+
+async function localSearchPlacesRequest(
+  query: string,
+  coords?: Coordinates,
+  radiusMeters = 25000,
+): Promise<ResolvedSearchPlace[]> {
+  const key = readLocalPlacesApiKey();
+  if (!key) return [];
+
+  const payload: Record<string, unknown> = {
+    textQuery: query.trim(),
+    maxResultCount: 8,
+  };
+  if (coords?.latitude != null && coords?.longitude != null) {
+    payload.locationBias = {
+      circle: {
+        center: { latitude: coords.latitude, longitude: coords.longitude },
+        radius: Math.min(Math.max(radiusMeters, 500), 50000),
+      },
+    };
+  }
+
+  const res = await fetch(`${BASE}/places:searchText`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": [
+        "places.id",
+        "places.displayName",
+        "places.formattedAddress",
+        "places.shortFormattedAddress",
+        "places.location",
+        "places.viewport",
+        "places.types",
+        "places.primaryType",
+        "places.photos",
+        "places.priceLevel",
+        "places.currentOpeningHours",
+      ].join(","),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Google Places text search error:", res.status, err);
+    throw new Error("Could not find that place.");
+  }
+  const data = await res.json();
+  return (data.places ?? [])
+    .map((p: Parameters<typeof mapResolvedPlace>[0]) => mapResolvedPlace(p))
+    .filter(Boolean) as ResolvedSearchPlace[];
+}
+
 export async function searchNearbyRestaurants(coords: Coordinates, radiusMeters = 1500): Promise<PlaceResult[]> {
-  // Yelp-first (Google Places can be re-enabled later).
   if (await shouldUseRemotePlaces()) {
-    return searchNearbyYelp(coords, radiusMeters);
+    return remote.searchNearbyRemote(coords, radiusMeters);
+  }
+  if (hasLocalPlacesApiKey()) {
+    return localPlacesRequest("places:searchNearby", {
+      includedTypes: ["restaurant"],
+      maxResultCount: 20,
+      locationRestriction: {
+        circle: {
+          center: { latitude: coords.latitude, longitude: coords.longitude },
+          radius: Math.min(Math.max(radiusMeters, 100), 50000),
+        },
+      },
+    });
   }
   // Try Demo — sample pins around the user so the map isn't empty.
   return mockNearbyPlaces(coords);
@@ -162,7 +292,20 @@ export async function searchRestaurantsByText(
 ): Promise<PlaceResult[]> {
   if (await shouldUseRemotePlaces()) {
     if (!coords) return [];
-    return searchNearbyYelp(coords, radiusMeters, query.trim() || "restaurants");
+    return remote.searchTextRemote(query, coords, radiusMeters);
+  }
+  if (hasLocalPlacesApiKey() && coords) {
+    const payload: Record<string, unknown> = {
+      textQuery: query.trim().includes("restaurant") ? query.trim() : `${query.trim()} restaurant`,
+      maxResultCount: 20,
+      locationBias: {
+        circle: {
+          center: { latitude: coords.latitude, longitude: coords.longitude },
+          radius: Math.min(Math.max(radiusMeters, 500), 50000),
+        },
+      },
+    };
+    return localPlacesRequest("places:searchText", payload);
   }
   if (!coords) return [];
   const q = query.trim().toLowerCase();
@@ -193,7 +336,8 @@ export async function fetchPlaceDetails(googlePlaceId: string): Promise<{
 
   if (await shouldUseRemotePlaces()) {
     try {
-      return await remote.fetchDetailsRemote(googlePlaceId);
+      const d = await remote.fetchDetailsRemote(googlePlaceId);
+      return { photos: d.photos, openNow: d.openNow };
     } catch {
       return { photos: [], openNow: null };
     }
@@ -202,7 +346,46 @@ export async function fetchPlaceDetails(googlePlaceId: string): Promise<{
   return { photos: [], openNow: null };
 }
 
-/** Debounced Discover autocomplete — Yelp restaurants when signed in. */
+/** Regular weekly hours for plan-a-visit time slots (Google Places). */
+export async function fetchRestaurantOpeningPeriods(
+  googlePlaceId: string | null | undefined,
+): Promise<OpeningPeriod[] | null> {
+  const rawId = googlePlaceId?.trim();
+  if (!rawId || isYelpPlaceId(rawId)) return null;
+  const id = normalizePlaceResourceId(rawId);
+
+  if (await shouldUseRemotePlaces()) {
+    try {
+      const d = await remote.fetchDetailsRemote(id);
+      return normalizeOpeningPeriods(d.openingPeriods ?? undefined);
+    } catch {
+      return null;
+    }
+  }
+
+  if (hasLocalPlacesApiKey()) {
+    try {
+      const key = readLocalPlacesApiKey();
+      const res = await fetch(`${BASE}/places/${id}`, {
+        headers: {
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask": "regularOpeningHours",
+        },
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as {
+        regularOpeningHours?: { periods?: { open?: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } }[] };
+      };
+      return normalizeOpeningPeriods(data.regularOpeningHours?.periods);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/** Debounced Discover autocomplete — Google Places when signed in. */
 export async function autocompletePlaces(
   input: string,
   opts?: {
@@ -215,8 +398,19 @@ export async function autocompletePlaces(
   if (!q) return [];
 
   if (await shouldUseRemotePlaces()) {
-    if (!opts?.coords) return [];
-    return searchYelpSuggestions(q, opts.coords, opts.radiusMeters ?? 25000);
+    try {
+      return await remote.autocompleteRemote(q, {
+        coords: opts?.coords,
+        sessionToken: opts?.sessionToken,
+        radiusMeters: opts?.radiusMeters ?? 25000,
+      });
+    } catch (e) {
+      if (!hasLocalPlacesApiKey()) throw e;
+    }
+  }
+
+  if (hasLocalPlacesApiKey()) {
+    return localAutocompleteRequest(q, opts);
   }
 
   if (!opts?.coords) return [];
@@ -271,14 +465,18 @@ export async function resolvePlaceDetails(
     try {
       return await remote.resolvePlaceRemote(googlePlaceId, sessionToken);
     } catch {
-      return null;
+      if (!hasLocalPlacesApiKey()) return null;
     }
+  }
+
+  if (hasLocalPlacesApiKey()) {
+    return localResolvePlaceRequest(googlePlaceId, sessionToken);
   }
 
   return null;
 }
 
-/** Free-text resolve for keyboard Search — Yelp term search when signed in. */
+/** Free-text resolve for keyboard Search — Google Places when signed in. */
 export async function searchPlacesByText(
   query: string,
   coords?: Coordinates,
@@ -288,23 +486,15 @@ export async function searchPlacesByText(
   if (!q) return [];
 
   if (await shouldUseRemotePlaces()) {
-    if (!coords) return [];
-    const places = await searchNearbyYelp(coords, radiusMeters, q);
-    return places.map((p) => ({
-      placeId: p.googlePlaceId,
-      name: p.name,
-      address: p.address,
-      city: p.city,
-      latitude: p.latitude,
-      longitude: p.longitude,
-      cuisineTypes: [p.cuisine],
-      primaryType: "restaurant",
-      imageUrl: p.imageUrl,
-      priceLevel: p.priceLevel,
-      openNow: p.openNow ?? null,
-      viewport: null,
-      kind: "restaurant" as const,
-    }));
+    try {
+      return await remote.searchPlacesRemote(q, coords, radiusMeters);
+    } catch (e) {
+      if (!hasLocalPlacesApiKey()) throw e;
+    }
+  }
+
+  if (hasLocalPlacesApiKey()) {
+    return localSearchPlacesRequest(q, coords, radiusMeters);
   }
 
   if (!coords) return [];

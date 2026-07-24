@@ -11,8 +11,8 @@ import {
 } from "@/lib/profile-menu";
 
 describe("profile menu configuration", () => {
-  it("keeps Rankings only (Journal lives on Bites tab)", () => {
-    expect(profileMenuLabels()).toEqual(["Rankings"]);
+  it("has no secondary menu rows (Rankings removed from Profile)", () => {
+    expect(profileMenuLabels()).toEqual([]);
   });
 
   it("does not include Taste DNA, Friends, or Food Journal", () => {
@@ -21,15 +21,12 @@ describe("profile menu configuration", () => {
     expect(PROFILE_MENU.some((i) => i.label === "Food Journal")).toBe(false);
   });
 
-  it("does not include Settings, Bites, Lists, or Food Wrapped", () => {
+  it("does not include Settings, Bites, Lists, Food Wrapped, or Rankings", () => {
     expect(profileMenuHasSettings()).toBe(false);
     expect(profileMenuHasBites()).toBe(false);
     expect(profileMenuHasLists()).toBe(false);
     expect(profileMenuHasWrapped()).toBe(false);
-  });
-
-  it("routes Rankings correctly", () => {
-    expect(PROFILE_MENU.find((i) => i.label === "Rankings")?.href).toBe("/rankings");
+    expect(PROFILE_MENU.some((i) => i.label === "Rankings")).toBe(false);
   });
 
   it("requires a 44pt settings touch target", () => {

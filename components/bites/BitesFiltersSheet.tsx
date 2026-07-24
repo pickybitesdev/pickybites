@@ -56,7 +56,7 @@ export function BitesFiltersSheet({
   const insets = useSafeAreaInsets();
   const colors = useThemedColors();
   const showVisibility = segment === "journal";
-  const showRating = segment === "journal" || segment === "favorites";
+  const showRating = segment === "journal";
   const showStatus = segment === "want_to_try";
 
   return (

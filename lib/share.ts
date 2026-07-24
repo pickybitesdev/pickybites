@@ -1,5 +1,6 @@
 import { Alert, Share, Linking, Platform } from "react-native";
 import { APP_NAME, APP_SCHEME } from "@/constants/branding";
+import { formatPlanWhen, isValidVisitTime } from "@/lib/plan-visit";
 
 const INVITE_TEXT = `Join me on ${APP_NAME} — rate restaurants, find your taste match, and discover spots your friends love.`;
 
@@ -39,6 +40,45 @@ export async function shareRestaurant(
     title: name,
     url: link,
   });
+}
+
+export function buildPlannedVisitShareMessage(opts: {
+  placeName: string;
+  dateIso: string;
+  timeHhmm: string;
+  cuisine?: string | null;
+  city?: string | null;
+  address?: string | null;
+  restaurantId?: string | null;
+}): { message: string; title: string; url?: string } {
+  const whenLabel =
+    isValidVisitTime(opts.timeHhmm) ? formatPlanWhen(opts.dateIso, opts.timeHhmm) : opts.dateIso;
+  const placeLine = opts.cuisine?.trim()
+    ? `${opts.placeName} (${opts.cuisine.trim()})`
+    : opts.placeName;
+  const loc = [opts.city, opts.address]
+    .map((x) => (x ?? "").trim())
+    .filter(Boolean)
+    .join(" · ");
+  const link = opts.restaurantId?.trim() ? restaurantDeepLink(opts.restaurantId.trim()) : undefined;
+  const where = loc ? ` in ${loc}` : "";
+  const body = `Want to go to ${placeLine}${where} on ${whenLabel}? I saved it on ${APP_NAME}.`;
+  const message = link ? `${body}\n\n${link}` : body;
+  return { message, title: `Plan: ${opts.placeName}`, url: link };
+}
+
+/** Share a Try Next visit plan (friend, date, group chat, etc.). */
+export async function sharePlannedVisit(opts: {
+  placeName: string;
+  dateIso: string;
+  timeHhmm: string;
+  cuisine?: string | null;
+  city?: string | null;
+  address?: string | null;
+  restaurantId?: string | null;
+}) {
+  const { message, title, url } = buildPlannedVisitShareMessage(opts);
+  await Share.share(url ? { message, title, url } : { message, title });
 }
 
 /** Share a place before it has a persisted restaurant id (no deep link). */

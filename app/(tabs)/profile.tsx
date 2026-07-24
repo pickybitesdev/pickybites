@@ -158,36 +158,38 @@ export default function ProfileScreen() {
 
         <ProfileFriendsPreview />
 
-        <View className="px-4 gap-3">
-          {PROFILE_MENU.map((m) => (
-            <Pressable
-              key={String(m.href)}
-              onPress={() => router.push(m.href)}
-              testID={`profile-menu-${m.label.toLowerCase().replace(/\s+/g, "-")}`}
-            >
-              <Card className="flex-row items-center gap-4 py-4">
-                <View
-                  className={`w-11 h-11 rounded-2xl items-center justify-center ${ui.surface.muted}`}
-                >
+        {PROFILE_MENU.length > 0 ? (
+          <View className="px-4 gap-3">
+            {PROFILE_MENU.map((m) => (
+              <Pressable
+                key={String(m.href)}
+                onPress={() => router.push(m.href)}
+                testID={`profile-menu-${m.label.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <Card className="flex-row items-center gap-4 py-4">
+                  <View
+                    className={`w-11 h-11 rounded-2xl items-center justify-center ${ui.surface.muted}`}
+                  >
+                    <Ionicons
+                      name={m.icon}
+                      size={22}
+                      color={isDark ? iconColors.brandDark : iconColors.brand}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-semibold text-base ${ui.text.primary}`}>{m.label}</Text>
+                    <Text className={`text-xs mt-0.5 ${ui.text.muted}`}>{m.desc}</Text>
+                  </View>
                   <Ionicons
-                    name={m.icon}
-                    size={22}
-                    color={isDark ? iconColors.brandDark : iconColors.brand}
+                    name="chevron-forward"
+                    size={20}
+                    color={isDark ? iconColors.mutedDark : iconColors.muted}
                   />
-                </View>
-                <View className="flex-1">
-                  <Text className={`font-semibold text-base ${ui.text.primary}`}>{m.label}</Text>
-                  <Text className={`text-xs mt-0.5 ${ui.text.muted}`}>{m.desc}</Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={isDark ? iconColors.mutedDark : iconColors.muted}
-                />
-              </Card>
-            </Pressable>
-          ))}
-        </View>
+                </Card>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

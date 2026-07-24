@@ -247,24 +247,7 @@ describe("profile navigation integration", () => {
     expect(screen.getByText("Alex Rivera")).toBeTruthy();
   });
 
-  it("keeps profile menu labels in the approved order", () => {
-    expect(profileMenuLabels()).toEqual(["Rankings"]);
-  });
-
-  it("opens Rankings from the secondary menu", async () => {
-    const result = renderRouter(
-      {
-        "(tabs)/profile": () => <ProfileShell />,
-        rankings: () => <LabelScreen label="Rankings Screen" />,
-      },
-      { initialUrl: "/(tabs)/profile" },
-    );
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("profile-menu-rankings"));
-    });
-
-    expect(result.getPathname()).toBe("/rankings");
-    expect(screen.getByText("Rankings Screen")).toBeTruthy();
+  it("has no secondary profile menu items", () => {
+    expect(profileMenuLabels()).toEqual([]);
   });
 });

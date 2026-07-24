@@ -11,7 +11,7 @@ import { APP_NAME } from "@/constants/branding";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
+import { FriendsSearchBar } from "@/components/profile/FriendsSearchBar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TasteMatchBadge } from "@/components/social/TasteMatchBadge";
 import { ui } from "@/constants/ui";
@@ -81,31 +81,14 @@ export function FriendsTab({ from = "profile-friends" }: { from?: "profile-frien
       .filter((x) => x.user);
   }, [hasQuery, users, query, currentUserId, reviews, restaurants]);
 
-  const myReviewCount = reviews.filter((r) => r.userId === currentUserId).length;
-
   return (
     <View className="gap-4">
-      <Card className="gap-3">
-        <View className="flex-row justify-around py-1">
-          <View className="items-center">
-            <Text className={`text-2xl font-bold ${ui.text.primary}`}>{followingIds.length}</Text>
-            <Text className={`text-xs ${ui.text.muted}`}>Following</Text>
-          </View>
-          <View className="items-center">
-            <Text className={`text-2xl font-bold ${ui.text.primary}`}>{myReviewCount}</Text>
-            <Text className={`text-xs ${ui.text.muted}`}>Your reviews</Text>
-          </View>
-        </View>
-        <Button label={`Invite Friends to ${APP_NAME}`} variant="secondary" onPress={() => shareInvite(me?.displayName)} />
-      </Card>
+      <FriendsSearchBar value={query} onChangeText={setQuery} />
 
-      <Input
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Find people by name, @username, or city..."
-        autoCapitalize="none"
-        autoCorrect={false}
-        testID="friends-search-input"
+      <Button
+        label={`Invite Friends to ${APP_NAME}`}
+        variant="secondary"
+        onPress={() => shareInvite(me?.displayName)}
       />
 
       {hasQuery ? (

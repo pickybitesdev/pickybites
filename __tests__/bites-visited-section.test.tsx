@@ -27,6 +27,12 @@ function makeBookmark(overrides: Partial<Bookmark>): Bookmark {
     visitedAt: null,
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-01T00:00:00Z",
+    createdVia: "in_app",
+    resolutionStatus: "linked",
+    sourcePlatform: null,
+    primarySourceTitle: null,
+    primarySourceThumbnailUrl: null,
+    sources: [],
     ...overrides,
   };
 }

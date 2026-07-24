@@ -89,6 +89,12 @@ describe("bites-search", () => {
       visitedAt: null,
       createdAt: "2024-01-01T00:00:00Z",
       updatedAt: "2024-01-01T00:00:00Z",
+    createdVia: "in_app",
+    resolutionStatus: "linked",
+    sourcePlatform: null,
+    primarySourceTitle: null,
+    primarySourceThumbnailUrl: null,
+    sources: [],
     };
     expect(matchesBookmark(b, "sushi")).toBe(true);
     expect(matchesBookmark(b, "omakase")).toBe(true);
@@ -146,6 +152,12 @@ describe("bites-filters", () => {
         visitedAt: null,
         createdAt: "2024-01-02T00:00:00Z",
         updatedAt: "2024-01-02T00:00:00Z",
+      createdVia: "in_app",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
       },
       {
         id: "2",
@@ -166,6 +178,12 @@ describe("bites-filters", () => {
         visitedAt: null,
         createdAt: "2024-01-01T00:00:00Z",
         updatedAt: "2024-01-01T00:00:00Z",
+      createdVia: "in_app",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
       },
     ];
     expect(
@@ -209,6 +227,12 @@ describe("bites-sort", () => {
         visitedAt: null,
         createdAt: "2024-01-02T00:00:00Z",
         updatedAt: "2024-01-02T00:00:00Z",
+      createdVia: "in_app",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
       },
       {
         id: "plan",
@@ -229,6 +253,12 @@ describe("bites-sort", () => {
         visitedAt: null,
         createdAt: "2024-01-01T00:00:00Z",
         updatedAt: "2024-01-01T00:00:00Z",
+      createdVia: "in_app",
+      resolutionStatus: "linked",
+      sourcePlatform: null,
+      primarySourceTitle: null,
+      primarySourceThumbnailUrl: null,
+      sources: [],
       },
     ];
     expect(sortBookmarks(bookmarks, "status").map((b) => b.id)).toEqual(["plan", "want"]);

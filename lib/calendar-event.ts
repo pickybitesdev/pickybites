@@ -4,6 +4,7 @@ import { buildGoogleCalendarUrl } from "@/lib/plan-visit";
 export async function addPlanToCalendar(opts: {
   placeName: string;
   dateIso: string;
+  timeHhmm: string;
   address?: string;
   city?: string;
 }): Promise<boolean> {
@@ -11,6 +12,7 @@ export async function addPlanToCalendar(opts: {
   const url = buildGoogleCalendarUrl({
     title: `Dinner at ${opts.placeName}`,
     dateIso: opts.dateIso,
+    timeHhmm: opts.timeHhmm,
     details: `Planned on PickyBites — ${opts.placeName}`,
     location: location || undefined,
   });

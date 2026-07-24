@@ -367,7 +367,7 @@ export default function DiscoverScreen() {
       }
 
       // City / neighborhood / address: move camera and fill results quietly.
-      // Keep the tray collapsed — user expands when they want the carousel.
+      setViewMode("map");
       setPinnedSearchPlace(null);
       setSelectedRestaurantId(null);
       setTrayExpanded(false);

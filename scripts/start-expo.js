@@ -1,5 +1,9 @@
 /**
- * Starts Expo dev server: frees port 8081, skips login prompt, passes through CLI flags.
+ * Starts Expo dev server: frees port 8081, passes through CLI flags.
+ *
+ * Do not pass --offline by default — it disables Expo CLI networking and causes
+ * Expo Go to show "Cannot connect to the server" even on the same Wi‑Fi.
+ * Use `npm run start:offline` only when you truly need offline mode.
  */
 const { spawn } = require("child_process");
 const path = require("path");
@@ -8,13 +12,7 @@ require("./free-port.js");
 
 const userArgs = process.argv.slice(2);
 const port = process.env.EXPO_PORT || "8081";
-const wantsTunnel = userArgs.includes("--tunnel");
-const expoArgs = ["expo", "start", "--port", port];
-
-// Skip the "Log in / Proceed anonymously" prompt (triggered when Expo Go connects).
-if (!wantsTunnel) {
-  expoArgs.push("--offline");
-}
+const expoArgs = ["expo", "start", "--port", port, "--lan"];
 
 expoArgs.push(...userArgs);
 

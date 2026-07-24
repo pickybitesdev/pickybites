@@ -9,8 +9,8 @@ export type FavoritesSort = "newest" | "oldest" | "name" | "highest_rated";
 export type ListsSort = "newest" | "oldest" | "name";
 
 export const JOURNAL_SORT_OPTIONS: { value: JournalSort; label: string }[] = [
-  { value: "newest", label: "Newest first" },
-  { value: "oldest", label: "Oldest first" },
+  { value: "newest", label: "Most recent" },
+  { value: "oldest", label: "Oldest visits" },
   { value: "highest_rated", label: "Highest rated" },
   { value: "lowest_rated", label: "Lowest rated" },
   { value: "name", label: "Name A–Z" },

@@ -4,3 +4,6 @@ verify_jwt = true
 [functions.yelp]
 verify_jwt = true
 
+[functions.share-resolve]
+verify_jwt = true
+

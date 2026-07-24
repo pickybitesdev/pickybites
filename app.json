@@ -39,6 +39,18 @@
     "plugins": [
       "expo-router",
       [
+        "expo-share-intent",
+        {
+          "iosAppGroupIdentifier": "group.com.pickybites.app",
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": ["text/*"]
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "PickyBites needs access to your photos to attach food images to reviews."

@@ -3,7 +3,6 @@ import {
   bitesCollectionIsEmpty,
   bitesHref,
   getBitesCollections,
-  lovesHeartLabel,
   selectBitesVisited,
   selectBitesWantToTry,
   visitedBookmarks,
@@ -31,6 +30,12 @@ function makeBookmark(overrides: Partial<Bookmark>): Bookmark {
     visitedAt: null,
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-01T00:00:00Z",
+    createdVia: "in_app",
+    resolutionStatus: "linked",
+    sourcePlatform: null,
+    primarySourceTitle: null,
+    primarySourceThumbnailUrl: null,
+    sources: [],
     ...overrides,
   };
 }
@@ -46,33 +51,17 @@ describe("bites collection selection", () => {
   });
 
   it("includes journal in segments and defaults labels", () => {
-    expect(BITES_SEGMENTS.map((s) => s.value)).toEqual([
-      "journal",
-      "want_to_try",
-      "favorites",
-      "lists",
-    ]);
-    expect(BITES_SEGMENTS.map((s) => s.label)).toEqual([
-      "Journal",
-      "Try Next",
-      "Loves",
-      "Lists",
-    ]);
+    expect(BITES_SEGMENTS.map((s) => s.value)).toEqual(["journal", "want_to_try", "lists"]);
+    expect(BITES_SEGMENTS.map((s) => s.label)).toEqual(["Journal", "Try Next", "Lists"]);
   });
 
-  it("builds deep links and Try Next / Loves bookmark labels", () => {
+  it("builds deep links and Try Next bookmark labels", () => {
     expect(bitesHref("want_to_try")).toEqual({
       pathname: "/(tabs)/bites",
       params: { segment: "want_to_try" },
     });
-    expect(bitesHref("favorites")).toEqual({
-      pathname: "/(tabs)/bites",
-      params: { segment: "favorites" },
-    });
     expect(wantToTryBookmarkLabel(false)).toBe("Save to Try Next");
     expect(wantToTryBookmarkLabel(true)).toBe("Remove from Try Next");
-    expect(lovesHeartLabel(false)).toBe("Add to Loves");
-    expect(lovesHeartLabel(true)).toBe("Remove from Loves");
   });
 
   it("puts unvisited saves in Try Next and keeps visited separately", () => {
@@ -94,11 +83,10 @@ describe("bites collection selection", () => {
   });
 
   it("treats Bites as empty only when all collections are empty", () => {
-    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 0, 0)).toBe(true);
-    expect(bitesCollectionIsEmpty(getBitesCollections([want]), 0, 0, 0)).toBe(false);
-    expect(bitesCollectionIsEmpty(getBitesCollections([visited]), 0, 0, 0)).toBe(false);
-    expect(bitesCollectionIsEmpty(getBitesCollections([]), 2, 0, 0)).toBe(false);
-    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 1, 0)).toBe(false);
-    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 0, 1)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 0)).toBe(true);
+    expect(bitesCollectionIsEmpty(getBitesCollections([want]), 0, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([visited]), 0, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 2, 0)).toBe(false);
+    expect(bitesCollectionIsEmpty(getBitesCollections([]), 0, 1)).toBe(false);
   });
 });

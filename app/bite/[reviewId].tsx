@@ -40,12 +40,6 @@ export default function BiteDetailScreen() {
   const follows = useAppStore((s) => s.follows);
   const deleteReview = useAppStore((s) => s.deleteReview);
   const updateReviewVisibility = useAppStore((s) => s.updateReviewVisibility);
-  const isFavorite = useAppStore((s) =>
-    review ? s.isRestaurantFavorite(review.restaurantId) : false,
-  );
-  const toggleRestaurantFavorite = useAppStore((s) => s.toggleRestaurantFavorite);
-  const toggleDishFavorite = useAppStore((s) => s.toggleDishFavorite);
-  const isDishFavorite = useAppStore((s) => s.isDishFavorite);
   const [refreshing, setRefreshing] = useState(false);
 
   const isOwn = Boolean(review && currentUserId && review.userId === currentUserId);
@@ -147,10 +141,6 @@ export default function BiteDetailScreen() {
                     text: `Visibility: ${VISIBILITY_LABEL[review.visibility]}`,
                     onPress: () => void cycleVisibility(),
                   },
-                  {
-                    text: isFavorite ? "Remove from Loves" : "Add to Loves",
-                    onPress: () => void toggleRestaurantFavorite(review.restaurantId),
-                  },
                   { text: "Delete", style: "destructive", onPress: confirmDelete },
                   { text: "Cancel", style: "cancel" },
                 ])
@@ -206,19 +196,6 @@ export default function BiteDetailScreen() {
                   <Text className={`text-base font-medium ${ui.text.primary}`}>{d.dish_name}</Text>
                   <Text className={`text-xs ${ui.text.muted}`}>{d.dish_rating.toFixed(1)}/10</Text>
                 </View>
-                <Pressable
-                  onPress={() => void toggleDishFavorite(d.dish_id)}
-                  hitSlop={8}
-                  accessibilityLabel={
-                    isDishFavorite(d.dish_id) ? "Remove dish from Loves" : "Add dish to Loves"
-                  }
-                >
-                  <Ionicons
-                    name={isDishFavorite(d.dish_id) ? "heart" : "heart-outline"}
-                    size={22}
-                    color={colors.brand}
-                  />
-                </Pressable>
               </View>
             ))}
           </View>

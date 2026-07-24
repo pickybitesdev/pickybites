@@ -3,7 +3,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { BitesSegment } from "@/lib/bites";
 import {
-  FAVORITES_SORT_OPTIONS,
   JOURNAL_SORT_OPTIONS,
   LISTS_SORT_OPTIONS,
   WANT_SORT_OPTIONS,
@@ -15,7 +14,6 @@ import { cn } from "@/lib/utils";
 function optionsForSegment(segment: BitesSegment) {
   if (segment === "journal") return JOURNAL_SORT_OPTIONS;
   if (segment === "want_to_try") return WANT_SORT_OPTIONS;
-  if (segment === "favorites") return FAVORITES_SORT_OPTIONS;
   return LISTS_SORT_OPTIONS;
 }
 

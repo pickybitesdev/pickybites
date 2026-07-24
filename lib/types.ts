@@ -95,6 +95,39 @@ export const BUCKET_SAVE_REASONS = [
   "Saved from Discover",
 ] as const;
 
+export type BookmarkCreatedVia =
+  | "discover"
+  | "share_extension"
+  | "manual"
+  | "in_app"
+  | "restaurant"
+  | "feed";
+
+export type BookmarkResolutionStatus = "linked" | "link_only" | "pending_link";
+
+export type ShareSourcePlatform =
+  | "instagram"
+  | "tiktok"
+  | "youtube"
+  | "facebook"
+  | "google_maps"
+  | "yelp"
+  | "restaurant_website"
+  | "web"
+  | "unknown";
+
+export interface SavedItemSource {
+  id: string;
+  savedRestaurantId: string;
+  userId: string;
+  sourceUrl: string;
+  canonicalUrl: string;
+  sourcePlatform: ShareSourcePlatform;
+  title: string | null;
+  thumbnailUrl: string | null;
+  createdAt: string;
+}
+
 export interface Bookmark {
   id: string;
   userId: string;
@@ -114,6 +147,12 @@ export interface Bookmark {
   visitedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  createdVia: BookmarkCreatedVia;
+  resolutionStatus: BookmarkResolutionStatus;
+  sourcePlatform: ShareSourcePlatform | null;
+  primarySourceTitle: string | null;
+  primarySourceThumbnailUrl: string | null;
+  sources: SavedItemSource[];
 }
 
 export interface Restaurant {

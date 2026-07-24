@@ -14,14 +14,10 @@ export type ProfileMenuItem = {
 };
 
 /**
- * Secondary Profile menu — Friends preview + Followers stat; Settings is header-only.
- * Journal lives on Bites tab; Settings is header-only.
+ * Secondary Profile menu — Friends preview + header CTAs; Settings is header-only.
+ * Journal lives on Bites tab.
  */
-export const PROFILE_MENU: ProfileMenuItem[] = [
-  { href: "/rankings", icon: "trophy", label: "Rankings", desc: "Your top spots & dishes" },
-  // Food Wrapped ships later — keep route/screen, hide from Profile until ready
-  // { href: "/wrapped", icon: "gift", label: "Food Wrapped", desc: "Swipeable year, month & all-time recap" },
-];
+export const PROFILE_MENU: ProfileMenuItem[] = [];
 
 export const PROFILE_SETTINGS_MIN_TOUCH = 44;
 

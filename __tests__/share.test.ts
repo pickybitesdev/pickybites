@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import {
+  buildPlannedVisitShareMessage,
   buildRestaurantDirectionsUrl,
   DIRECTIONS_UNAVAILABLE_MESSAGE,
   hasValidCoordinates,
@@ -56,5 +57,23 @@ describe("share directions helpers", () => {
   it("builds restaurant deep links without leaking secrets", () => {
     expect(restaurantDeepLink("rest-1")).toBe("pickybites://restaurant/rest-1");
     expect(restaurantDeepLink("rest-1")).not.toMatch(/api[_-]?key/i);
+  });
+
+  it("builds planned visit share copy with deep link when restaurant id exists", () => {
+    const { message, title, url } = buildPlannedVisitShareMessage({
+      placeName: "Nori House",
+      dateIso: "2026-07-26",
+      timeHhmm: "19:00",
+      cuisine: "Japanese",
+      city: "Los Angeles",
+      address: "123 Main St",
+      restaurantId: "rest-nori",
+    });
+    expect(title).toBe("Plan: Nori House");
+    expect(message).toContain("Nori House (Japanese)");
+    expect(message).toContain("Los Angeles");
+    expect(message).toMatch(/7:00|19:00|PM/i);
+    expect(message).toContain("pickybites://restaurant/rest-nori");
+    expect(url).toBe("pickybites://restaurant/rest-nori");
   });
 });

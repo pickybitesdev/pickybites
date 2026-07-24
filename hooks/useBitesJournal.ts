@@ -2,8 +2,6 @@ import { useMemo } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import {
   getFoodJournalEntries,
-  getFoodJournalStats,
-  groupJournalByMonth,
   journalHasMapPins,
   FOOD_JOURNAL_EMPTY,
 } from "@/lib/foodJournal";
@@ -34,15 +32,11 @@ export function useBitesJournal(
     return sortJournalEntries(filtered, sort);
   }, [allEntries, search, filters, sort]);
 
-  const months = useMemo(() => groupJournalByMonth(filteredEntries), [filteredEntries]);
-  const stats = useMemo(() => getFoodJournalStats(allEntries), [allEntries]);
   const hasMapPins = useMemo(() => journalHasMapPins(allEntries), [allEntries]);
 
   return {
     allEntries,
     entries: filteredEntries,
-    months,
-    stats,
     hasMapPins,
     isLoading: !isDataLoaded,
     isEmpty: allEntries.length === 0,

@@ -33,13 +33,20 @@ describe("places search readiness", () => {
     expect(isPlacesSearchReady({ isAuthenticated: false, useRemotePlaces: false })).toBe(true);
   });
 
-  it("requires sign-in when remote Yelp/Supabase is used", () => {
+  it("requires sign-in when remote Google Places/Supabase is used", () => {
     process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY = "";
     mockSupabaseConfigured.mockReturnValue(true);
     expect(isGooglePlacesConfigured()).toBe(true);
     expect(getPlacesSearchStatus({ isAuthenticated: false, useRemotePlaces: true })).toBe("sign_in");
     expect(getPlacesSearchStatus({ isAuthenticated: true, useRemotePlaces: true })).toBe("ready");
     expect(isPlacesSearchReady({ isAuthenticated: false, useRemotePlaces: true })).toBe(false);
+  });
+
+  it("allows city search via local Google key without sign-in", () => {
+    process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY = "AIzaSyTestKeyForLocal";
+    mockSupabaseConfigured.mockReturnValue(true);
+    expect(getPlacesSearchStatus({ isAuthenticated: false, useRemotePlaces: true })).toBe("ready");
+    expect(isPlacesSearchReady({ isAuthenticated: false, useRemotePlaces: true })).toBe(true);
   });
 
   it("uses demo pins when useRemotePlaces is false even if Supabase URL is set", () => {
