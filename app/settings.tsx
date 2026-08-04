@@ -1,27 +1,16 @@
 import { View, Text, ScrollView, Alert, Pressable } from "react-native";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
-import { useThemeStore, type ThemeMode } from "@/store/useThemeStore";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { shareInvite } from "@/lib/share";
 import { APP_NAME } from "@/constants/branding";
-import { ui } from "@/constants/ui";
-import { cn } from "@/lib/utils";
 import { useThemedColors } from "@/lib/useThemedColors";
-import { hapticSelection } from "@/lib/haptics";
-
-const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { mode: "light", label: "Light", icon: "sunny-outline" },
-  { mode: "dark", label: "Dark", icon: "moon-outline" },
-  { mode: "system", label: "System", icon: "phone-portrait-outline" },
-];
 
 export default function SettingsScreen() {
   const logout = useAppStore((s) => s.logout);
+  const deleteAccount = useAppStore((s) => s.deleteAccount);
   const user = useAppStore((s) => s.users.find((u) => u.id === s.currentUserId));
-  const { mode, setMode } = useThemeStore();
   const colors = useThemedColors();
 
   const handleLogout = () => {
@@ -31,34 +20,44 @@ export default function SettingsScreen() {
     ]);
   };
 
+  // Required by App Store Review Guideline 5.1.1(v) and Play's data-deletion
+  // policy. Two confirmations because it is irreversible.
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete account?",
+      "This permanently deletes your account, reviews, photos, lists, and saved spots. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert("Are you sure?", "This is permanent. There is no way to recover your data.", [
+              { text: "Keep my account", style: "cancel" },
+              {
+                text: "Delete forever",
+                style: "destructive",
+                onPress: async () => {
+                  const result = await deleteAccount();
+                  if (!result.ok) {
+                    Alert.alert("Couldn't delete account", result.error);
+                    return;
+                  }
+                  router.replace("/login");
+                },
+              },
+            ]);
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView className="flex-1 bg-savr-50 dark:bg-savr-950" contentContainerClassName="px-4 pb-6 gap-4">
       <Card className="gap-2">
         <Text className="font-semibold text-savr-900 dark:text-savr-100">Account</Text>
         <Text className="text-sm text-savr-350 dark:text-savr-300">{user?.email}</Text>
-        <Text className="text-xs text-savr-400 dark:text-savr-500">Avatar upload available when Supabase Storage is configured.</Text>
-      </Card>
-
-      <Card className="gap-3">
-        <Text className="font-semibold text-savr-900 dark:text-savr-100">Appearance</Text>
-        <View className="flex-row gap-2">
-          {THEME_OPTIONS.map((opt) => (
-            <Pressable
-              key={opt.mode}
-              onPress={() => { hapticSelection(); setMode(opt.mode); }}
-              className={`flex-1 items-center py-3 rounded-xl border ${
-                mode === opt.mode
-                  ? "bg-savr-100 dark:bg-savr-800 border-savr-500 dark:border-savr-500"
-                  : cn(ui.surface.inset, ui.border.subtle, "border")
-              }`}
-            >
-              <Ionicons name={opt.icon} size={22} color={mode === opt.mode ? colors.brand : colors.iconMuted} />
-              <Text className={`text-xs font-medium mt-1 ${mode === opt.mode ? "text-savr-500 dark:text-savr-100" : ui.text.muted}`}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
       </Card>
 
       <Card className="gap-2">
@@ -74,6 +73,16 @@ export default function SettingsScreen() {
       <Button label={`Invite Friends to ${APP_NAME}`} variant="secondary" onPress={() => shareInvite(user?.displayName)} />
       <Button label="Edit Profile" variant="secondary" onPress={() => router.push("/edit-profile")} />
       <Button label="Log Out" variant="danger" onPress={handleLogout} />
+
+      <Card className="gap-2">
+        <Text className="font-semibold text-savr-900 dark:text-savr-100">Danger zone</Text>
+        <Text className="text-sm text-savr-350 dark:text-savr-300">
+          Permanently delete your account and everything in it.
+        </Text>
+        <Pressable onPress={handleDeleteAccount} className="py-3" testID="delete-account">
+          <Text className="font-semibold" style={{ color: colors.danger }}>Delete Account</Text>
+        </Pressable>
+      </Card>
     </ScrollView>
   );
 }

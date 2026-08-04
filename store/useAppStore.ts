@@ -23,6 +23,14 @@ import { isDishFavorited, isRestaurantFavorited } from "@/lib/favorites";
 
 export type AuthResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * Signup can succeed without producing a session when email confirmation is on.
+ * `needsConfirmation` means "account created, but do not treat as signed in".
+ */
+export type SignupResult =
+  | { ok: true; needsConfirmation?: boolean; email?: string }
+  | { ok: false; error: string };
+
 interface AppState {
   hasSeenOnboarding: boolean;
   isAuthenticated: boolean;
@@ -49,8 +57,9 @@ interface AppState {
   initialize: () => Promise<void>;
   completeOnboarding: () => void;
   login: (email: string, password: string) => Promise<AuthResult>;
-  demoLogin: () => Promise<AuthResult>;
-  signup: (data: { email: string; password: string; username: string; displayName: string; city: string }) => Promise<AuthResult>;
+  signup: (data: { email: string; password: string; username: string; displayName: string; city: string }) => Promise<SignupResult>;
+  resendConfirmation: (email: string) => Promise<AuthResult>;
+  deleteAccount: () => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshFeed: () => Promise<void>;
   loadData: () => Promise<void>;
@@ -92,7 +101,7 @@ interface AppState {
       reason?: string;
     };
     saveToBites?: boolean;
-  }) => Promise<{ reviewId: string; restaurantId: string } | { error: string }>;
+  }) => Promise<{ reviewId: string; restaurantId: string; photoErrors?: string[] } | { error: string }>;
   updateReview: (
     reviewId: string,
     data: {
@@ -105,8 +114,10 @@ interface AppState {
       text: string;
       visitDate: string;
       tags: ReviewTag[];
+      /** Local URIs for photos added during this edit. */
+      newPhotoUris?: string[];
     },
-  ) => Promise<{ ok: true } | { error: string }>;
+  ) => Promise<{ ok: true; photoErrors: string[] } | { error: string }>;
   deleteReview: (reviewId: string) => Promise<{ ok: true } | { error: string }>;
   toggleLike: (reviewId: string) => Promise<void>;
   addComment: (reviewId: string, text: string) => Promise<void>;
@@ -367,36 +378,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().registerPush();
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "Login failed" };
-    }
-  },
-
-  demoLogin: async () => {
-    const user = MOCK_USERS.find((u) => u.email === DEMO_EMAIL);
-    if (!user) return { ok: false, error: "Demo user not found" };
-
-    // Always use local mock data for Try Demo so Profile/Feed work without a
-    // seeded Supabase project or working Places keys.
-    notificationUnsub?.();
-    notificationUnsub = null;
-    set({
-      hasSeenOnboarding: true,
-      useSupabase: false,
-      isAuthenticated: true,
-      currentUserId: user.id,
-      isDataLoaded: true,
-      ...mockDataState(),
-    });
-
-    // Drop any remote session; auth listener no-ops while useSupabase is false.
-    if (isSupabaseConfigured()) {
-      try {
-        await supabaseApi.signOut();
-      } catch {
-        // ignore — demo is local-only
+      const raw = e instanceof Error ? e.message : "Login failed";
+      if (/email not confirmed/i.test(raw)) {
+        return { ok: false, error: "UNCONFIRMED_EMAIL" };
       }
+      return { ok: false, error: raw };
     }
-    return { ok: true };
   },
 
   signup: async (data) => {
@@ -414,17 +401,63 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ok: true };
     }
     try {
-      const userId = await supabaseApi.signUp(data);
+      const available = await supabaseApi.isUsernameAvailable(data.username);
+      if (!available) {
+        return { ok: false, error: `"${data.username.trim().toLowerCase()}" is already taken.` };
+      }
+    } catch {
+      // Availability check is advisory — the DB trigger still de-duplicates.
+    }
+    try {
+      const outcome = await supabaseApi.signUp(data);
+      if (outcome.status === "needs_confirmation") {
+        // Deliberately NOT setting isAuthenticated: there is no session yet, so
+        // every RLS-protected write (including the taste quiz) would fail.
+        return { ok: true, needsConfirmation: true, email: outcome.email };
+      }
+      const { userId } = outcome;
       const allData = await supabaseApi.fetchAllData(userId);
       set({ isAuthenticated: true, currentUserId: userId, ...allData, isDataLoaded: true });
-      if (userId) {
-        setupNotificationListener(userId);
-        get().registerPush();
-      }
+      setupNotificationListener(userId);
+      get().registerPush();
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Signup failed" };
     }
+  },
+
+  resendConfirmation: async (email) => {
+    if (!get().useSupabase) return { ok: true };
+    try {
+      await supabaseApi.resendConfirmation(email);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Could not resend email" };
+    }
+  },
+
+  deleteAccount: async () => {
+    const uid = get().currentUserId;
+    if (!uid) return { ok: false, error: "Not signed in" };
+
+    if (get().useSupabase) {
+      try {
+        await supabaseApi.deleteAccount();
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "Could not delete account" };
+      }
+    }
+
+    notificationUnsub?.();
+    notificationUnsub = null;
+    set({
+      isAuthenticated: false,
+      currentUserId: null,
+      useSupabase: isSupabaseConfigured(),
+      isDataLoaded: true,
+      ...emptyDataState(),
+    });
+    return { ok: true };
   },
 
   logout: async () => {
@@ -576,7 +609,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           isDataLoaded: true,
         }));
         await markVisited(result.restaurantId);
-        return { reviewId: result.reviewId, restaurantId: result.restaurantId };
+        return {
+          reviewId: result.reviewId,
+          restaurantId: result.restaurantId,
+          photoErrors: result.photoErrors,
+        };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Failed to publish review" };
       }
@@ -667,10 +704,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().useSupabase) {
       try {
         const updated = await supabaseApi.updateReviewDb(uid, reviewId, { ...data, ...structured });
+        const { reviewPhotos, photoErrors } = await supabaseApi.addReviewPhotos(
+          uid,
+          reviewId,
+          data.newPhotoUris ?? [],
+        );
         set((s) => ({
           reviews: s.reviews.map((r) => (r.id === reviewId ? updated : r)),
+          reviewPhotos: [...reviewPhotos, ...s.reviewPhotos],
         }));
-        return { ok: true };
+        return { ok: true, photoErrors };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Update failed" };
       }
@@ -681,7 +724,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         r.id === reviewId ? { ...r, ...structured, text: data.text, visitDate: data.visitDate, tags: data.tags } : r,
       ),
     }));
-    return { ok: true };
+    return { ok: true, photoErrors: [] };
   },
 
   deleteReview: async (reviewId) => {

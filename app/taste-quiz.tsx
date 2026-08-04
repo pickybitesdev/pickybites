@@ -72,7 +72,12 @@ export default function TasteQuizScreen() {
         favoriteRestaurant: favoriteRestaurant.trim(),
         foodGoals: goals,
       };
-      await saveTastePreferences(currentUserId, prefs);
+      const saved = await saveTastePreferences(currentUserId, prefs);
+      if (!saved.ok) {
+        setLoading(false);
+        setError(saved.error);
+        return;
+      }
     }
     setLoading(false);
     hapticSuccess();

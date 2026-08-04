@@ -32,7 +32,7 @@ const me: User = {
   displayName: "Me",
   avatarUrl: null,
   city: "LA",
-  bio: null,
+  bio: "",
   favoriteCuisines: [],
   hasCompletedTasteQuiz: false,
   createdAt: "2024-01-01T00:00:00Z",
@@ -63,7 +63,7 @@ function mockStore(overrides: {
   const restaurants = overrides.restaurants ?? [];
 
   jest.spyOn(require("@/store/useAppStore"), "useAppStore").mockImplementation(
-    (selector?: (s: Record<string, unknown>) => unknown) => {
+    ((selector?: (s: Record<string, unknown>) => unknown) => {
       const state = {
         users,
         currentUserId: me.id,
@@ -72,7 +72,7 @@ function mockStore(overrides: {
         follows,
       };
       return selector ? selector(state) : state;
-    },
+    }) as unknown as (...args: unknown[]) => unknown,
   );
 }
 

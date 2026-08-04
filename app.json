@@ -4,34 +4,43 @@
     "slug": "pickybites",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "pickybites",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/images/logo.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAFAFA"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.pickybites.app"
+      "bundleIdentifier": "com.pickybites.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#C96B75",
-        "foregroundImage": "./assets/images/logo.png"
+        "backgroundColor": "#FFFDFC",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "package": "com.pickybites.app",
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "pickybites" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "pickybites"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ]
@@ -47,7 +56,9 @@
             "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
             "NSExtensionActivationSupportsText": true
           },
-          "androidIntentFilters": ["text/*"]
+          "androidIntentFilters": [
+            "text/*"
+          ]
         }
       ],
       [
@@ -77,9 +88,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
       "eas": {
-        "projectId": "e870b8ed-b8b7-4cd5-abbf-f01725d49b6f"
+        "projectId": "92b2518b-84b3-43c1-8997-4357e1e56f12"
       }
     }
   }

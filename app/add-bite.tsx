@@ -27,6 +27,10 @@ import { NewPostRestaurantRow } from "@/components/add-bite/NewPostRestaurantRow
 import { NewPostRatingRow } from "@/components/add-bite/NewPostRatingRow";
 import { NewPostDishesSection } from "@/components/add-bite/NewPostDishesSection";
 import { NewPostMoreSection } from "@/components/add-bite/NewPostMoreSection";
+import { NewPostCategorySection } from "@/components/add-bite/NewPostCategorySection";
+import { computeAutoOverall } from "@/lib/review-scores";
+
+const clampScore = (n: number) => Math.min(10, Math.max(1, Math.round(n)));
 import { Button } from "@/components/ui/Button";
 import { getCurrentCoordinates } from "@/lib/location";
 import type { Coordinates } from "@/lib/places/types";
@@ -72,6 +76,7 @@ export default function AddBiteScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [pickingRestaurant, setPickingRestaurant] = useState(false);
   const [moreExpanded, setMoreExpanded] = useState(false);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const submitLock = useRef(false);
   const hydrated = useRef(false);
   const deepLinkApplied = useRef(false);
@@ -122,6 +127,7 @@ export default function AddBiteScreen() {
         if (!prefilled.skipCompare && prefilled.compareRestaurantId) {
           setMoreExpanded(true);
         }
+        if (prefilled.includeCategories) setCategoriesExpanded(true);
       })();
       return;
     }
@@ -142,6 +148,7 @@ export default function AddBiteScreen() {
         if (!saved.skipCompare && saved.compareRestaurantId) {
           setMoreExpanded(true);
         }
+        if (saved.includeCategories) setCategoriesExpanded(true);
       }
     })();
   }, [currentUserId, params.restaurantId, params.bookmarkId, restaurants, bookmarks]);
@@ -308,13 +315,18 @@ export default function AddBiteScreen() {
         ratingMax: 10,
         normalizedRating: normalized.normalizedRating,
         visibility,
-        categoryScores: {
-          foodQuality: Math.min(10, Math.max(1, draft.ratingValue)),
-          service: Math.min(10, Math.max(1, draft.ratingValue)),
-          atmosphere: Math.min(10, Math.max(1, draft.ratingValue)),
-          value: Math.min(10, Math.max(1, draft.ratingValue)),
-        },
-        ratingManualOverride: true,
+        // Only claim per-category scores when the user actually set them;
+        // otherwise mirror the overall and mark it an explicit override, so
+        // fabricated category data never reaches the database.
+        categoryScores: draft.includeCategories
+          ? draft.categoryScores
+          : {
+              foodQuality: clampScore(draft.ratingValue),
+              service: clampScore(draft.ratingValue),
+              atmosphere: clampScore(draft.ratingValue),
+              value: clampScore(draft.ratingValue),
+            },
+        ratingManualOverride: draft.includeCategories ? ratingChosen : true,
         waitTime: draft.waitTime,
         wouldReturn: draft.wouldReturn,
         wouldRecommend: draft.wouldRecommend,
@@ -339,6 +351,14 @@ export default function AddBiteScreen() {
       }
       if (currentUserId) await clearAddBiteDraft(currentUserId);
       hapticSuccess();
+      if (result.photoErrors && result.photoErrors.length > 0) {
+        // The review saved; the photos did not. Previously this failed silently
+        // and the post just appeared without images.
+        Alert.alert(
+          "Some photos didn't upload",
+          `${result.photoErrors.length} of ${photos.length} failed. ${result.photoErrors[0]}\n\nYour post was saved — you can add photos again by editing it.`,
+        );
+      }
       patch({ mode: "success", restaurantId: result.restaurantId });
     } catch (e) {
       Alert.alert("Submission failed", e instanceof Error ? e.message : "Try again");
@@ -529,6 +549,39 @@ export default function AddBiteScreen() {
             }
           />
 
+          <NewPostCategorySection
+            expanded={categoriesExpanded}
+            onToggle={() => {
+              setCategoriesExpanded((v) => {
+                const next = !v;
+                // Opening the section is the opt-in: from here the categories
+                // are real values rather than copies of the overall score.
+                if (next && !draft.includeCategories) patch({ includeCategories: true });
+                return next;
+              });
+            }}
+            scores={draft.categoryScores}
+            onChange={(categoryScores) =>
+              patch({
+                categoryScores,
+                includeCategories: true,
+                // Overall tracks the categories until the user taps a score.
+                ...(ratingChosen
+                  ? {}
+                  : { ratingValue: computeAutoOverall(categoryScores), ratingMax: 10 }),
+              })
+            }
+            overall={draft.ratingValue}
+            manualOverride={ratingChosen}
+            onUseAutoOverall={() =>
+              patch({
+                ratingValue: computeAutoOverall(draft.categoryScores),
+                ratingMax: 10,
+                ratingChosen: false,
+              })
+            }
+          />
+
           <NewPostDishesSection
             dishes={draft.dishes}
             onChange={(dishes) => patch({ dishes })}
@@ -589,6 +642,14 @@ export default function AddBiteScreen() {
           <NewPostMoreSection
             expanded={moreExpanded}
             onToggle={() => setMoreExpanded((v) => !v)}
+            visitDetails={{
+              waitTime: draft.waitTime,
+              wouldReturn: draft.wouldReturn,
+              wouldRecommend: draft.wouldRecommend,
+              visitDate: draft.visitDate,
+              tags: draft.tags,
+            }}
+            onVisitDetailsChange={(next) => patch(next)}
             options={comparedOptions}
             compareRestaurantId={draft.compareRestaurantId}
             comparePreference={draft.comparePreference}

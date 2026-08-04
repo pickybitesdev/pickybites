@@ -6,7 +6,7 @@ import { brandColors } from "@/constants/branding";
 
 interface ButtonProps extends PressableProps {
   label: string;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "demo";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   loading?: boolean;
   className?: string;
   haptic?: boolean;
@@ -21,14 +21,12 @@ export function Button({ label, variant = "primary", loading, className, disable
     secondary: "bg-white dark:bg-savr-875 border border-savr-500 dark:border-savr-500 active:bg-savr-100 dark:active:bg-savr-800",
     ghost: "bg-transparent active:bg-savr-100 dark:active:bg-savr-925",
     danger: "bg-[#D94A4A] active:opacity-90",
-    demo: "bg-savr-900 dark:bg-savr-600 active:opacity-90",
   };
   const textVariants = {
     primary: "text-white font-semibold text-base",
     secondary: "text-savr-500 dark:text-savr-500 font-semibold text-base",
     ghost: "text-savr-500 dark:text-savr-500 font-semibold text-base",
     danger: "text-white font-semibold text-base",
-    demo: "text-white font-semibold text-base",
   };
 
   const handlePress = (e: Parameters<NonNullable<PressableProps["onPress"]>>[0]) => {
@@ -51,7 +49,7 @@ export function Button({ label, variant = "primary", loading, className, disable
       {loading ? (
         <ActivityIndicator
           color={
-            variant === "primary" || variant === "danger" || variant === "demo"
+            variant === "primary" || variant === "danger"
               ? "#fff"
               : colors.brand
           }

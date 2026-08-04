@@ -25,7 +25,7 @@ export function FriendsSearchBar({
         accessibilityRole="search"
       >
         <View className="w-10 h-10 rounded-full bg-savr-100 dark:bg-savr-800 items-center justify-center">
-          <Ionicons name="search" size={22} color={colors.primary} />
+          <Ionicons name="search" size={22} color={colors.brand} />
         </View>
         <TextInput
           value={value}
