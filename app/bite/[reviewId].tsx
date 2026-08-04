@@ -16,6 +16,8 @@ import { toFoodJournalEntry } from "@/lib/foodJournal";
 import { Button } from "@/components/ui/Button";
 import { ReviewCard } from "@/components/reviews/ReviewCard";
 import { formatDate } from "@/lib/utils";
+import { Tag } from "@/components/ui/Tag";
+import { CATEGORY_LABELS, WAIT_TIME_OPTIONS } from "@/lib/review-scores";
 import { ui } from "@/constants/ui";
 import { useThemedColors } from "@/lib/useThemedColors";
 import type { ReviewVisibility } from "@/lib/types";
@@ -102,6 +104,22 @@ export default function BiteDetailScreen() {
     );
   }
 
+  // Fields the composer captures but the detail view never surfaced.
+  const visitFacts = [
+    entry.wait_time
+      ? {
+          label: "Wait",
+          value: WAIT_TIME_OPTIONS.find((o) => o.value === entry.wait_time)?.label ?? entry.wait_time,
+        }
+      : null,
+    entry.would_return === null
+      ? null
+      : { label: "Would return", value: entry.would_return ? "Yes" : "No" },
+    entry.would_recommend === null
+      ? null
+      : { label: "Would recommend", value: entry.would_recommend ? "Yes" : "No" },
+  ].filter((f): f is { label: string; value: string } => f !== null);
+
   const cycleVisibility = async () => {
     const order: ReviewVisibility[] = ["private", "friends", "public"];
     const next = order[(order.indexOf(review.visibility) + 1) % order.length];
@@ -183,6 +201,40 @@ export default function BiteDetailScreen() {
         {entry.review_text ? (
           <Text className={`text-base leading-6 ${ui.text.secondary}`}>{entry.review_text}</Text>
         ) : null}
+
+        {entry.tags.length > 0 ? (
+          <View className="flex-row flex-wrap gap-2">
+            {entry.tags.map((t) => (
+              <Tag key={t} label={t} active size="sm" />
+            ))}
+          </View>
+        ) : null}
+
+        {visitFacts.length > 0 ? (
+          <View className="gap-2">
+            <Text className={`text-sm font-semibold uppercase ${ui.text.muted}`}>Visit</Text>
+            {visitFacts.map(({ label, value }) => (
+              <View key={label} className="flex-row items-center justify-between">
+                <Text className={`text-sm ${ui.text.muted}`}>{label}</Text>
+                <Text className={`text-sm font-medium ${ui.text.primary}`}>{value}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {entry.rating_manual_override ? null : (
+          <View className="gap-2">
+            <Text className={`text-sm font-semibold uppercase ${ui.text.muted}`}>Scores</Text>
+            {CATEGORY_LABELS.map(({ key, label }) => (
+              <View key={key} className="flex-row items-center justify-between">
+                <Text className={`text-sm ${ui.text.muted}`}>{label}</Text>
+                <Text className={`text-sm font-medium ${ui.text.primary}`}>
+                  {entry.category_scores[key]}/10
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {entry.dishes.length > 0 ? (
           <View className="gap-2">

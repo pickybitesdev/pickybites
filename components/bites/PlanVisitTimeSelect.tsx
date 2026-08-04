@@ -79,7 +79,7 @@ export function PlanVisitTimeSelect({
                       {slot.label}
                     </Text>
                     {active ? (
-                      <Ionicons name="checkmark" size={22} color={colors.primary} />
+                      <Ionicons name="checkmark" size={22} color={colors.brand} />
                     ) : null}
                   </Pressable>
                 );

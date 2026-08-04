@@ -11,7 +11,7 @@ function user(partial: Partial<User> & Pick<User, "id" | "displayName" | "userna
     email: `${partial.username}@example.com`,
     avatarUrl: null,
     city: partial.city ?? "",
-    bio: null,
+    bio: "",
     favoriteCuisines: [],
     hasCompletedTasteQuiz: false,
     createdAt: "2024-01-01T00:00:00Z",

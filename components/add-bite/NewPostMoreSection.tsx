@@ -3,6 +3,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tag } from "@/components/ui/Tag";
 import { brandColors } from "@/constants/branding";
 import { ui } from "@/constants/ui";
+import {
+  VisitDetailsFields,
+  type VisitDetailsValue,
+} from "@/components/reviews/VisitDetailsFields";
 import type { ComparisonPreference, Restaurant } from "@/lib/types";
 
 export function NewPostMoreSection({
@@ -14,6 +18,8 @@ export function NewPostMoreSection({
   onSelectRestaurant,
   onSelectPreference,
   onClear,
+  visitDetails,
+  onVisitDetailsChange,
 }: {
   expanded: boolean;
   onToggle: () => void;
@@ -23,6 +29,8 @@ export function NewPostMoreSection({
   onSelectRestaurant: (id: string) => void;
   onSelectPreference: (pref: ComparisonPreference) => void;
   onClear: () => void;
+  visitDetails: VisitDetailsValue;
+  onVisitDetailsChange: (next: VisitDetailsValue) => void;
 }) {
   return (
     <View className="gap-2">
@@ -41,6 +49,14 @@ export function NewPostMoreSection({
       </Pressable>
 
       {expanded ? (
+        <View className="gap-5">
+          <View
+            className="gap-3 rounded-2xl border p-3"
+            style={{ borderColor: brandColors.border }}
+          >
+            <VisitDetailsFields value={visitDetails} onChange={onVisitDetailsChange} />
+          </View>
+
         <View className="gap-3 rounded-2xl border p-3" style={{ borderColor: brandColors.border }}>
           <View className="gap-1">
             <Text className={`text-sm font-semibold ${ui.text.primary}`}>
@@ -99,6 +115,7 @@ export function NewPostMoreSection({
               <Text className={`text-sm font-semibold ${ui.text.secondary}`}>Clear compare</Text>
             </Pressable>
           ) : null}
+        </View>
         </View>
       ) : null}
     </View>

@@ -147,7 +147,7 @@ export function BucketListCard({
 
         {bookmark.status !== "visited" && (onMarkPlanned || onMarkVisited) ? (
           <View className={`flex-row gap-2 px-3 pb-3 pt-1 border-t ${ui.border.divider}`}>
-            {onMarkPlanned && bookmark.status !== "visited" ? (
+            {onMarkPlanned ? (
               <Pressable
                 onPress={(e) => { e?.stopPropagation?.(); onMarkPlanned(); }}
                 className={`flex-1 flex-row items-center justify-center gap-1 py-2 rounded-xl ${ui.surface.muted}`}

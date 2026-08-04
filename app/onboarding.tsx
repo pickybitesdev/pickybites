@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { useAppStore } from "@/store/useAppStore";
 import { brandColors } from "@/constants/branding";
-import { hapticSuccess } from "@/lib/haptics";
-import { routeAfterAuth } from "@/lib/navigation";
 
 const slides = [
   { icon: "star" as const, title: "Rate every bite", desc: "Score restaurants and dishes from 1.0 to 10.0" },
@@ -17,17 +15,6 @@ const slides = [
 
 export default function Onboarding() {
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
-  const demoLogin = useAppStore((s) => s.demoLogin);
-
-  const handleDemo = async () => {
-    const result = await demoLogin();
-    if (result.ok) {
-      hapticSuccess();
-      const uid = useAppStore.getState().currentUserId;
-      const user = useAppStore.getState().users.find((u) => u.id === uid);
-      router.replace(routeAfterAuth(user));
-    }
-  };
 
   return (
     <SafeAreaView className="flex-1 bg-savr-50 dark:bg-savr-950">
@@ -48,7 +35,6 @@ export default function Onboarding() {
         </View>
       </View>
       <View className="px-6 pb-6 gap-3">
-        <Button label="Try Demo — Skip Setup" variant="demo" onPress={handleDemo} />
         <Button label="Get Started" onPress={() => { completeOnboarding(); router.replace("/signup"); }} />
         <Button label="I have an account" variant="secondary" onPress={() => { completeOnboarding(); router.replace("/login"); }} />
       </View>

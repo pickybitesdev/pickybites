@@ -11,6 +11,7 @@ import { Tag } from "@/components/ui/Tag";
 import { Card } from "@/components/ui/Card";
 import { PlaceSearch } from "@/components/restaurants/PlaceSearch";
 import { VisitDatePicker } from "@/components/reviews/VisitDatePicker";
+import { VisitDetailsFields } from "@/components/reviews/VisitDetailsFields";
 import { StepProgress } from "@/components/reviews/StepProgress";
 import {
   StructuredRatingForm,
@@ -145,11 +146,18 @@ function EditReviewScreen({
         text,
         visitDate,
         tags,
+        newPhotoUris: photos,
       });
       setLoading(false);
       if ("error" in result) {
         Alert.alert("Could not save", result.error);
         return;
+      }
+      if (result.photoErrors.length > 0) {
+        Alert.alert(
+          "Some photos didn't upload",
+          `${result.photoErrors.length} of ${photos.length} failed. ${result.photoErrors[0]}`,
+        );
       }
       router.replace(`/restaurant/${editingReview.restaurantId}`);
       return;
@@ -234,12 +242,42 @@ function EditReviewScreen({
         </Card>
         <StructuredRatingForm value={ratingState} onChange={setRatingState} />
         <Input label="Review" value={text} onChangeText={setText} multiline numberOfLines={4} placeholder="What did you think?" />
-        <VisitDatePicker value={visitDate} onChange={setVisitDate} />
-        <View className="flex-row flex-wrap gap-2">
-          {REVIEW_TAGS.map((t) => (
-            <Tag key={t} label={t} active={tags.includes(t)} onPress={() => setTags((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t])} />
-          ))}
+
+        <VisitDetailsFields
+          value={{
+            waitTime: ratingState.waitTime,
+            wouldReturn: ratingState.wouldReturn,
+            wouldRecommend: ratingState.wouldRecommend,
+            visitDate,
+            tags,
+          }}
+          onChange={(next) => {
+            setRatingState((prev) => ({
+              ...prev,
+              waitTime: next.waitTime,
+              wouldReturn: next.wouldReturn,
+              wouldRecommend: next.wouldRecommend,
+            }));
+            setVisitDate(next.visitDate);
+            setTags(next.tags);
+          }}
+          showWaitTime={false}
+          showOpinions={false}
+        />
+
+        <View className="gap-2">
+          <Text className={`text-xs font-semibold uppercase ${ui.text.muted}`}>Add photos</Text>
+          <Pressable onPress={pickPhoto} className={`items-center py-6 rounded-2xl ${ui.surface.inset}`}>
+            <Ionicons name="camera-outline" size={28} color="#9D9692" />
+            <Text className={`mt-2 ${ui.text.secondary}`}>Tap to add photos</Text>
+          </Pressable>
+          <View className="flex-row flex-wrap gap-2">
+            {photos.map((uri, i) => (
+              <Image key={`${uri}-${i}`} source={{ uri }} style={{ width: 72, height: 72, borderRadius: 12 }} />
+            ))}
+          </View>
         </View>
+
         <Button label="Save Changes" onPress={submit} loading={loading} />
       </ScrollView>
     );

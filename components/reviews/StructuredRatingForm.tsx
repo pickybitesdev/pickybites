@@ -9,6 +9,7 @@ import { clampRating } from "@/lib/review-validation";
 import { CategoryRatingRow } from "@/components/reviews/CategoryRatingRow";
 import { Card } from "@/components/ui/Card";
 import { Tag } from "@/components/ui/Tag";
+import { VisitDetailsFields } from "@/components/reviews/VisitDetailsFields";
 import { ui } from "@/constants/ui";
 import { cn } from "@/lib/utils";
 
@@ -108,44 +109,25 @@ export function StructuredRatingForm({ value, onChange }: Props) {
         </Pressable>
       </Card>
 
-      <View className="gap-2">
-        <Text className={`text-xs font-semibold uppercase ${ui.text.muted}`}>Wait time (optional)</Text>
-        <View className="flex-row flex-wrap gap-2">
-          <Tag
-            label="Skip"
-            active={value.waitTime === null}
-            onPress={() => onChange({ ...value, waitTime: null })}
-            size="sm"
-          />
-          {WAIT_TIME_OPTIONS.map((opt) => (
-            <Tag
-              key={opt.value}
-              label={opt.label}
-              active={value.waitTime === opt.value}
-              onPress={() => onChange({ ...value, waitTime: opt.value })}
-              size="sm"
-            />
-          ))}
-        </View>
-      </View>
-
-      <View className="gap-2">
-        <Text className={`text-xs font-semibold uppercase ${ui.text.muted}`}>Would return? (optional)</Text>
-        <View className="flex-row flex-wrap gap-2">
-          <Tag label="Skip" active={value.wouldReturn === null} onPress={() => onChange({ ...value, wouldReturn: null })} size="sm" />
-          <Tag label="Yes" active={value.wouldReturn === true} onPress={() => onChange({ ...value, wouldReturn: true })} size="sm" />
-          <Tag label="No" active={value.wouldReturn === false} onPress={() => onChange({ ...value, wouldReturn: false })} size="sm" />
-        </View>
-      </View>
-
-      <View className="gap-2">
-        <Text className={`text-xs font-semibold uppercase ${ui.text.muted}`}>Would recommend? (optional)</Text>
-        <View className="flex-row flex-wrap gap-2">
-          <Tag label="Skip" active={value.wouldRecommend === null} onPress={() => onChange({ ...value, wouldRecommend: null })} size="sm" />
-          <Tag label="Yes" active={value.wouldRecommend === true} onPress={() => onChange({ ...value, wouldRecommend: true })} size="sm" />
-          <Tag label="No" active={value.wouldRecommend === false} onPress={() => onChange({ ...value, wouldRecommend: false })} size="sm" />
-        </View>
-      </View>
+      <VisitDetailsFields
+        value={{
+          waitTime: value.waitTime,
+          wouldReturn: value.wouldReturn,
+          wouldRecommend: value.wouldRecommend,
+          visitDate: "",
+          tags: [],
+        }}
+        onChange={(next) =>
+          onChange({
+            ...value,
+            waitTime: next.waitTime,
+            wouldReturn: next.wouldReturn,
+            wouldRecommend: next.wouldRecommend,
+          })
+        }
+        showDate={false}
+        showTags={false}
+      />
     </View>
   );
 }

@@ -294,7 +294,7 @@ export function PlanVisitSheet({
               !canSave && "opacity-40",
             )}
           >
-            <Ionicons name="share-outline" size={20} color={colors.primary} />
+            <Ionicons name="share-outline" size={20} color={colors.brand} />
             <View className="items-center">
               <Text className="text-base font-semibold text-savr-500 dark:text-savr-500">
                 Share plan

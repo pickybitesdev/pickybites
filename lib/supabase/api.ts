@@ -4,7 +4,7 @@ import {
   mapFollow, mapLike, mapComment, mapList, mapListItem, mapListCollaborator, mapNotification, mapBookmark,
   mapFavorite,
 } from "./mappers";
-import { uploadReviewPhoto } from "./storage";
+import { uploadReviewPhotos } from "./storage";
 import type {
   Comment, Dish, Follow, Like, List, ListItem, ListCollaborator,
   Restaurant, Review, ReviewPhoto, ReviewTag, ReviewCategoryScores, WaitTime, User, AppNotification, Bookmark,
@@ -15,6 +15,7 @@ import type { PlaceResult } from "@/lib/places/types";
 import { buildStructuredReviewFields } from "@/lib/review-scores";
 import { buildNormalizedRating, legacyTenPointFromNormalized } from "@/lib/rating-scale";
 import { createNotification } from "./tier1";
+import { APP_SCHEME } from "@/constants/branding";
 
 /** Tier B/C tables — app works without these until you run the matching migrations. */
 function isOptionalTableMissing(message: string) {
@@ -131,17 +132,30 @@ export async function signIn(email: string, password: string) {
   return data.user?.id ?? null;
 }
 
+/**
+ * Result of a sign-up attempt.
+ *
+ * When Supabase has "Confirm email" enabled (the default for new projects),
+ * `signUp` returns a user but NO session. Treating that as signed-in puts the
+ * app in a broken half-authenticated state: every RLS-protected write fails.
+ * So we report it explicitly and let the UI ask the user to confirm.
+ */
+export type SignUpOutcome =
+  | { status: "active"; userId: string }
+  | { status: "needs_confirmation"; email: string };
+
 export async function signUp(data: {
   email: string;
   password: string;
   username: string;
   displayName: string;
   city: string;
-}) {
+}): Promise<SignUpOutcome> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
+  const email = data.email.trim().toLowerCase();
   const { data: authData, error } = await supabase.auth.signUp({
-    email: data.email.trim().toLowerCase(),
+    email,
     password: data.password,
     options: {
       data: {
@@ -149,10 +163,63 @@ export async function signUp(data: {
         display_name: data.displayName.trim(),
         city: data.city.trim(),
       },
+      emailRedirectTo: `${APP_SCHEME}://login`,
     },
   });
   if (error) throw new Error(error.message);
-  return authData.user?.id ?? null;
+
+  // No session => confirmation required. This also covers the case where the
+  // email is already registered: Supabase returns an obfuscated user with no
+  // session rather than an error, to avoid leaking which addresses exist.
+  if (!authData.session || !authData.user) {
+    return { status: "needs_confirmation", email };
+  }
+  return { status: "active", userId: authData.user.id };
+}
+
+/** Re-send the confirmation email for an unconfirmed signup. */
+export async function resendConfirmation(email: string) {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.trim().toLowerCase(),
+    options: { emailRedirectTo: `${APP_SCHEME}://login` },
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Username availability pre-check.
+ *
+ * The `handle_new_user` trigger silently appends a numeric suffix on collision,
+ * so without this the user asks for "alex" and quietly becomes "alex3".
+ * Backed by a SECURITY DEFINER RPC because the `users` SELECT policy is
+ * authenticated-only and sign-up happens while anonymous.
+ */
+export async function isUsernameAvailable(username: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase.rpc("is_username_available", {
+    candidate: username.trim().toLowerCase(),
+  });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
+/** Permanently delete the signed-in user and all their data (Apple 5.1.1(v)). */
+export async function deleteAccount(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data, error } = await supabase.functions.invoke("delete-account", {
+    method: "POST",
+  });
+  if (error) throw new Error(error.message);
+  if (data && typeof data === "object" && "error" in data && data.error) {
+    throw new Error(String(data.error));
+  }
+  // Clear the now-orphaned local session; ignore failures, the user is gone.
+  await supabase.auth.signOut().catch(() => {});
 }
 
 export async function signOut() {
@@ -267,6 +334,8 @@ export async function createReview(
   restaurant: Restaurant;
   dishes: Dish[];
   reviewPhotos: ReviewPhoto[];
+  /** Non-fatal: the review saved, but these photos did not. */
+  photoErrors: string[];
 }> {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
@@ -365,17 +434,12 @@ export async function createReview(
     if (dishError) throw new Error(dishError.message);
   }
 
-  const photoUrls = (
-    await Promise.all(
-      data.photoUris.map(async (uri, i) => {
-        try {
-          return await uploadReviewPhoto(userId, review.id, uri, i);
-        } catch {
-          return null;
-        }
-      }),
-    )
-  ).filter((url): url is string => !!url);
+  const { urls: photoUrls, errors: photoUploadErrors } = await uploadReviewPhotos(
+    userId,
+    review.id,
+    data.photoUris,
+  );
+  const photoErrors = [...photoUploadErrors];
 
   let reviewPhotos: ReviewPhoto[] = [];
   if (photoUrls.length > 0) {
@@ -383,7 +447,12 @@ export async function createReview(
       .from("review_photos")
       .insert(photoUrls.map((url) => ({ review_id: review.id, url, user_id: userId })))
       .select();
-    if (!photoError && photoRows) {
+    if (photoError) {
+      // The upload succeeded but the row did not — without this the photo is
+      // orphaned in storage and invisible in the app, with no error anywhere.
+      console.error("review_photos insert failed:", photoError.message);
+      photoErrors.push(photoError.message);
+    } else if (photoRows) {
       reviewPhotos = photoRows.map(mapReviewPhoto);
       await supabase.from("restaurants").update({ image_url: photoUrls[0] }).eq("id", restaurant.id);
       restaurant = { ...restaurant, imageUrl: photoUrls[0] };
@@ -418,7 +487,33 @@ export async function createReview(
     restaurant,
     dishes,
     reviewPhotos,
+    photoErrors,
   };
+}
+
+/** Attach more photos to an existing review (used by the edit flow). */
+export async function addReviewPhotos(
+  userId: string,
+  reviewId: string,
+  localUris: string[],
+): Promise<{ reviewPhotos: ReviewPhoto[]; photoErrors: string[] }> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase not configured");
+  if (localUris.length === 0) return { reviewPhotos: [], photoErrors: [] };
+
+  const { urls, errors } = await uploadReviewPhotos(userId, reviewId, localUris);
+  const photoErrors = [...errors];
+  if (urls.length === 0) return { reviewPhotos: [], photoErrors };
+
+  const { data: rows, error } = await supabase
+    .from("review_photos")
+    .insert(urls.map((url) => ({ review_id: reviewId, url, user_id: userId })))
+    .select();
+  if (error) {
+    console.error("review_photos insert failed:", error.message);
+    return { reviewPhotos: [], photoErrors: [...photoErrors, error.message] };
+  }
+  return { reviewPhotos: (rows ?? []).map(mapReviewPhoto), photoErrors };
 }
 
 export async function updateReviewDb(

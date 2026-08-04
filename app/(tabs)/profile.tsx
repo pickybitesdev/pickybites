@@ -38,17 +38,9 @@ export default function ProfileScreen() {
             Profile not loaded
           </Text>
           <Text className={`text-sm text-center ${ui.text.muted}`}>
-            Your account session is active, but we couldn&apos;t find your profile data. Try Demo
-            for a full sample account, or sign out and create a new account.
+            Your account session is active, but we couldn&apos;t find your profile data. Try
+            signing out and back in.
           </Text>
-          <Button
-            label="Try Demo — Alex Rivera"
-            variant="demo"
-            onPress={async () => {
-              await useAppStore.getState().demoLogin();
-            }}
-            testID="profile-empty-demo"
-          />
           <Button
             label="Sign out"
             variant="secondary"

@@ -10,15 +10,30 @@ import type { MonthStats } from "@/lib/journal-stats";
 import { ui } from "@/constants/ui";
 import { cn } from "@/lib/utils";
 
-function StatPill({ label, value, suffix = "" }: { label: string; value: number; suffix?: string }) {
+function StatPill({
+  label,
+  value,
+  suffix = "",
+  display,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  /** Static text shown instead of the counter (e.g. an em dash for "no data"). */
+  display?: string;
+}) {
   return (
     <Card className="flex-1 items-center py-4 px-2 gap-1">
-      <CountUpText
-        value={value}
-        decimals={label === "Avg Rating" ? 1 : 0}
-        suffix={suffix}
-        className={`text-2xl font-bold ${ui.text.primary}`}
-      />
+      {display !== undefined ? (
+        <Text className={`text-2xl font-bold ${ui.text.primary}`}>{display}</Text>
+      ) : (
+        <CountUpText
+          value={value}
+          decimals={label === "Avg Rating" ? 1 : 0}
+          suffix={suffix}
+          className={`text-2xl font-bold ${ui.text.primary}`}
+        />
+      )}
       <Text className={`text-xs text-center ${ui.text.muted}`}>{label}</Text>
     </Card>
   );
@@ -37,10 +52,11 @@ export function FoodJournalSection({ stats }: { stats: MonthStats }) {
       <View className="flex-row gap-3">
         <StatPill label="Restaurants Visited" value={stats.restaurantsVisited} />
         <StatPill label="New Cuisines" value={stats.newCuisines} />
-        <StatPill
-          label="Avg Rating"
-          value={stats.averageRating > 0 ? `${stats.averageRating.toFixed(1)}/10` : "—"}
-        />
+        {stats.averageRating > 0 ? (
+          <StatPill label="Avg Rating" value={stats.averageRating} suffix="/10" />
+        ) : (
+          <StatPill label="Avg Rating" value={0} display="—" />
+        )}
       </View>
 
       <Button label="View Food Journal" variant="secondary" onPress={() => router.push("/journal")} />

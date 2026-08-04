@@ -14,7 +14,17 @@ interface ThemeState {
   hydrate: () => Promise<void>;
 }
 
+/**
+ * Dark mode is disabled for launch — the dark palette clashes on iOS.
+ *
+ * Pinned here rather than deleting the ~234 `dark:` classes across the app, so
+ * the work is recoverable: set this to false to re-enable, and restore the
+ * Appearance selector in app/settings.tsx.
+ */
+const FORCE_LIGHT = true;
+
 function resolve(mode: ThemeMode): "light" | "dark" {
+  if (FORCE_LIGHT) return "light";
   if (mode === "system") {
     return Appearance.getColorScheme() === "dark" ? "dark" : "light";
   }
@@ -30,6 +40,7 @@ export const useThemeStore = create<ThemeState>((set, get) => {
   apply(initial);
 
   Appearance.addChangeListener(({ colorScheme: cs }) => {
+    if (FORCE_LIGHT) return;
     if (get().mode !== "system") return;
     const resolved = cs === "dark" ? "dark" : "light";
     if (get().resolved === resolved) return;

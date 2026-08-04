@@ -20,7 +20,7 @@ export type TabDefinition = {
 };
 
 /** Default destination after auth / taste quiz when the user is fully set up. */
-export const AUTHENTICATED_HOME: Href = "/(tabs)/discover";
+export const AUTHENTICATED_HOME = "/(tabs)/discover" as const satisfies Href;
 
 /**
  * Bottom tab configuration in display order.
